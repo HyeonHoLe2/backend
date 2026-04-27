@@ -36,5 +36,10 @@ out/
 ### VS Code ###
 .vscode/
 .env
+.env.prod
+
+/resources/application.properties
+/resources/application-dev.properties
+/resources/application-prod.properties
 .env.prod.omc/
 .omc/
