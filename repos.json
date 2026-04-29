@@ -1,6 +1,6 @@
 [
-  {"owner": "spring-projects", "repo": "spring-framework"},
-  {"owner": "spring-projects", "repo": "spring-boot"},
-  {"owner": "langchain-ai",    "repo": "langchain"},
-  {"owner": "openai",          "repo": "openai-cookbook"}
+  {"owner": "microsoft", "repo": "VibeVoice"},
+  {"owner": "ComposioHQ", "repo": "awesome-codex-skills"},
+  {"owner": "abhigyanpatwari",    "repo": "GitNexus"},
+  {"owner": "mattpocock",          "repo": "skills"}
 ]

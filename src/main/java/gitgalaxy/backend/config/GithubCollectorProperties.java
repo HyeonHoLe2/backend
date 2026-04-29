@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 @Data
 public class GithubCollectorProperties {
 
-    /** GitHub Personal Access Token (환경변수 GITHUB_TOKEN 으로 주입) */
     private String token = "";
 
     /** repo 목록 파일 경로 (.json 또는 .csv) */
