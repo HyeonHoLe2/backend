@@ -3,9 +3,12 @@ package gitgalaxy.backend.service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
+import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.model.ChunkDocument;
 import gitgalaxy.backend.model.RepoInput;
+import gitgalaxy.backend.model.RepoMeta;
 import gitgalaxy.backend.model.RepoResult;
+import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,8 @@ public class RepoCollectorService {
     private final ChunkingService chunkingService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+    private final RepoRepository repoRepository;
+    private final EmbeddingPipelineService embeddingPipelineService;
 
     // ────────────────────────────────────────────────
     // Batch entry
@@ -95,9 +100,10 @@ public class RepoCollectorService {
         }
 
         try {
-            // ── default branch 조회 ──
-            String branch = githubClient.getDefaultBranch(input.owner(), input.repo());
-            log.debug("{}: default branch = {}", input.fullName(), branch);
+            // ── repo 메타 조회 (branch + star + description) ──
+            RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
+            String branch = meta.defaultBranch();
+            log.debug("{}: branch={}, stars={}", input.fullName(), branch, meta.stargazersCount());
 
             // ── tree recursive 조회 ──
             List<String> allPaths = githubClient.getRepoTree(input.owner(), input.repo(), branch);
@@ -124,6 +130,12 @@ public class RepoCollectorService {
             // ── JSONL 저장 ──
             storageService.saveChunks(input.owner(), input.repo(), allChunks);
 
+            // ── Repo 엔티티 DB 저장 ──
+            upsertRepo(input, meta);
+
+            // ── 임베딩 파이프라인 (OPENAI_API_KEY 설정 시) ──
+            embeddingPipelineService.embedAndStore(allChunks);
+
             return RepoResult.builder()
                     .owner(input.owner()).repo(input.repo())
                     .status("success")
@@ -143,6 +155,27 @@ public class RepoCollectorService {
                     .processedAt(LocalDateTime.now())
                     .build();
         }
+    }
+
+    // ────────────────────────────────────────────────
+    // Repo 엔티티 upsert
+    // ────────────────────────────────────────────────
+
+    private void upsertRepo(RepoInput input, RepoMeta meta) {
+        Repo repo = repoRepository.findByFullName(input.fullName())
+                .orElse(Repo.builder()
+                        .fullName(input.fullName())
+                        .owner(input.owner())
+                        .name(input.repo())
+                        .createdAt(LocalDateTime.now())
+                        .build());
+
+        repo.setDescription(meta.description());
+        repo.setStarCount(meta.stargazersCount());
+        repo.setDefaultBranch(meta.defaultBranch());
+        repo.setTracked(true);
+        repo.setLastCollectedAt(LocalDateTime.now());
+        repoRepository.save(repo);
     }
 
     // ────────────────────────────────────────────────

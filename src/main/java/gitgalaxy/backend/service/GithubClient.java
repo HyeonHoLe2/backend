@@ -3,6 +3,7 @@ package gitgalaxy.backend.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
+import gitgalaxy.backend.model.RepoMeta;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -43,15 +44,25 @@ public class GithubClient {
     // Public API
     // ────────────────────────────────────────────────
 
-    /** repo의 default branch 이름 반환 */
-    public String getDefaultBranch(String owner, String repo) {
+    /** repo 메타 정보 반환 (defaultBranch, description, stargazersCount) */
+    public RepoMeta getRepoMeta(String owner, String repo) {
         String url = API_BASE + "/repos/" + owner + "/" + repo;
         String body = executeApiGet(url);
         try {
-            return objectMapper.readTree(body).get("default_branch").asText();
+            JsonNode node = objectMapper.readTree(body);
+            return new RepoMeta(
+                    node.path("default_branch").asText("main"),
+                    node.path("description").asText(""),
+                    node.path("stargazers_count").asInt(0)
+            );
         } catch (Exception e) {
-            throw new RuntimeException("default_branch 파싱 실패: " + url, e);
+            throw new RuntimeException("RepoMeta 파싱 실패: " + url, e);
         }
+    }
+
+    /** repo의 default branch 이름 반환 */
+    public String getDefaultBranch(String owner, String repo) {
+        return getRepoMeta(owner, repo).defaultBranch();
     }
 
     /** recursive tree 조회 → blob 파일 경로 목록 반환 */
