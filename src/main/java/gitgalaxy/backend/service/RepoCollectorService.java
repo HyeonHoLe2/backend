@@ -183,14 +183,25 @@ public class RepoCollectorService {
     // ────────────────────────────────────────────────
 
     public List<RepoInput> loadRepoList() {
+        // 1. DB에서 추적 중인 repo 로드
+        List<Repo> trackedRepos = repoRepository.findByTrackedTrue();
+        if (!trackedRepos.isEmpty()) {
+            log.info("DB에서 추적 repo {}개 로드", trackedRepos.size());
+            return trackedRepos.stream()
+                    .map(r -> new RepoInput(r.getOwner(), r.getName()))
+                    .toList();
+        }
+
+        // 2. fallback: repos.json / repos.csv
         String pathStr = props.getRepoListPath();
         Path filePath = Path.of(pathStr);
 
         if (!Files.exists(filePath)) {
-            log.warn("repo 목록 파일을 찾을 수 없습니다: {}", filePath.toAbsolutePath());
+            log.warn("DB에 tracked repo 없음, repo 목록 파일도 없음: {}", filePath.toAbsolutePath());
             return List.of();
         }
 
+        log.info("DB에 tracked repo 없음 → 파일에서 로드: {}", filePath.toAbsolutePath());
         try {
             if (pathStr.endsWith(".json")) {
                 return objectMapper.readValue(filePath.toFile(), new TypeReference<List<RepoInput>>() {});

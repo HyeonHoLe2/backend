@@ -30,6 +30,7 @@ public class Repo {
     private int starCount;
     private String defaultBranch;
     private boolean tracked;
+    private String language;
 
     private LocalDateTime lastCollectedAt;
     private LocalDateTime createdAt;
