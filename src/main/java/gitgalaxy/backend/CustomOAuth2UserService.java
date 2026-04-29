@@ -1,24 +1,21 @@
 package gitgalaxy.backend;
 
-import gitgalaxy.backend.entity.AppUser;
-import gitgalaxy.backend.repository.AppUserRepository;
+import gitgalaxy.backend.service.UserSyncService;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
-    private final AppUserRepository appUserRepository;
+    private final UserSyncService userSyncService;
 
-    public CustomOAuth2UserService(AppUserRepository appUserRepository) {
-        this.appUserRepository = appUserRepository;
+    public CustomOAuth2UserService(UserSyncService userSyncService) {
+        this.userSyncService = userSyncService;
     }
 
     @Override
-    @Transactional
     public OAuth2User loadUser(OAuth2UserRequest request) {
         OAuth2User oauth2User = super.loadUser(request);
 
@@ -28,13 +25,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             return oauth2User;
         }
 
-        AppUser appUser = appUserRepository.findByGithubId(githubId).orElseGet(AppUser::new);
-        appUser.setGithubId(githubId);
-        appUser.setGithubLogin(login);
-
-
-        appUser.setProfileUrl(stringAttr(oauth2User, "avatar_url"));
-        appUserRepository.save(appUser);
+        userSyncService.syncUser(githubId, login, stringAttr(oauth2User, "avatar_url"));
 
         return oauth2User;
     }
