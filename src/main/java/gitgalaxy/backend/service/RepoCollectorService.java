@@ -44,6 +44,7 @@ public class RepoCollectorService {
     private final ChunkingService chunkingService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+    private final AiSummerize aiSummerize;
 
     // ────────────────────────────────────────────────
     // Batch entry
@@ -108,9 +109,11 @@ public class RepoCollectorService {
 
             // ── 파일별 다운로드 & chunking ──
             List<ChunkDocument> allChunks = new ArrayList<>();
+            List<String> contents = new ArrayList<>();
             for (String filePath : docPaths) {
                 try {
                     String content = githubClient.getRawContent(input.owner(), input.repo(), branch, filePath);
+                    contents.add(content);
                     String fileUrl = buildGithubUrl(input.owner(), input.repo(), branch, filePath);
                     List<ChunkDocument> chunks = chunkingService.chunk(
                             content, input.owner(), input.repo(), filePath, fileUrl);
@@ -123,7 +126,8 @@ public class RepoCollectorService {
 
             // ── JSONL 저장 ──
             storageService.saveChunks(input.owner(), input.repo(), allChunks);
-
+            storageService.saveFile(input.owner(), input.repo(), contents);
+            aiSummerize.summarize(input.owner(), input.repo());
             return RepoResult.builder()
                     .owner(input.owner()).repo(input.repo())
                     .status("success")

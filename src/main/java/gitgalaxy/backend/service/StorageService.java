@@ -61,6 +61,23 @@ public class StorageService {
         log.info("[{}] chunks.jsonl 저장 완료: {} 청크", owner + "/" + repo, chunks.size());
     }
 
+    public void saveFile(String owner, String repo, List<String> contents) throws IOException {
+        Path dir = repoDir(owner, repo);
+        Files.createDirectories(dir);
+        Path jsonlFile = dir.resolve("intro.jsonl");
+        try (BufferedWriter writer = Files.newBufferedWriter(jsonlFile, StandardCharsets.UTF_8)) {
+            for (String content : contents) {
+                writer.write(objectMapper.writeValueAsString(content));
+                writer.newLine();
+            }
+        }
+
+        log.info("[{}] intro.jsonl 저장 완료", owner + "/" + repo);
+
+    }
+
+
+
     // ────────────────────────────────────────────────
     // Batch 요약 저장
     // ────────────────────────────────────────────────
