@@ -43,3 +43,4 @@ out/
 /resources/application-prod.properties
 .env.prod.omc/
 .omc/
+.claude/

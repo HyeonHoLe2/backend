@@ -31,7 +31,7 @@ public class RepoBatchJob {
     private final RepoCollectorService repoCollectorService;
     private final GithubCollectorProperties props;
 
-    @Scheduled(cron = "${github.collector.cron-expression:0 * * * * *}")
+    @Scheduled(cron = "${github.collector.cron-expression:0 0 * * * *}")
     public void run() {
         // GitHub Token 미설정 시 조기 종료
         if (props.getToken() == null || props.getToken().isBlank()) {
