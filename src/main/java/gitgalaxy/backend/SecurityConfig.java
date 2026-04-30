@@ -28,7 +28,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**"
                         ).permitAll()
                         .requestMatchers("/users/me/**").authenticated()
-                        .requestMatchers("/users/**", "/repos/**").permitAll()
+                        .requestMatchers("/users/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
@@ -52,7 +52,7 @@ public class SecurityConfig {
                             if (accept != null && accept.contains("application/json")) {
                                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                                 response.setContentType("application/json;charset=UTF-8");
-                                response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"로그인이 필요합니다.\"}");
+                                response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"로그인이 필요합니다. 브라우저에서 /oauth2/authorization/github 로 먼저 로그인하세요.\"}");
                             } else {
                                 response.sendRedirect("/oauth2/authorization/github");
                             }

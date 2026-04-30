@@ -18,6 +18,9 @@ services:
       - postgres
     env_file:
       - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: postgres
     ports:
       - "8080:8080"
 
