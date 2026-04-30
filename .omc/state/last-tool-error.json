@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git push origin main\",\"description\":\"Push to origin main\"}",
-  "error": "Exit code 128\nremote: Repository not found.\nfatal: repository 'https://github.com/2026-teecher-team-b/backend.git/' not found",
-  "timestamp": "2026-04-03T15:06:01.230Z",
+  "tool_input_preview": "{\"command\":\"python3 << 'PYEOF'\\nimport json, urllib.request, ssl, time\\n\\nctx = ssl._create_unverified_context()\\nTOKEN = \\\"ntn_wN8165879247kYHIwwEiJBucEjbKrKloS1jFXgqC0uqeLW\\\"\\nHDR = {\\\"Authorization...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 20, in <module>\n  File \"<stdin>\", line 10, in req\n  File \"/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py\", line 215, in urlopen\n    return opener.open(url, data, timeout)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py\", line 521, in open\n    response = meth(req, response)\n               ^^^^^^^^^^^^^^^^^...",
+  "timestamp": "2026-04-30T16:11:58.789Z",
   "retry_count": 1
 }

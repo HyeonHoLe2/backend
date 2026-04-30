@@ -23,14 +23,14 @@ public class GhArchiveBatchJob {
     private final RepoRepository repoRepository;
     private final EmbeddingPipelineService embeddingPipelineService;
 
-    // 매 시각 10분 후 실행 (GH Archive 업로드 대기)
+    // 매 시각 10분 후 (GH Archive 업로드 대기)
     @Scheduled(cron = "${gharchive.cron-expression:0 10 * * * *}")
     public void run() {
         LocalDateTime prevHour = LocalDateTime.now()
                 .minusHours(1).withMinute(0).withSecond(0).withNano(0);
         log.info("GhArchiveBatchJob 시작: hour={}", prevHour);
 
-        // GH Archive 처리: 메트릭 집계 + 텍스트 청크 추출
+        // GH Archive 처리: repo_time 메트릭 upsert + 텍스트 청크 추출
         List<ChunkDocument> chunks;
         try {
             chunks = ghArchiveService.processHour(prevHour);
@@ -39,20 +39,20 @@ public class GhArchiveBatchJob {
             return;
         }
 
-        // 추출된 commit/PR/issue 텍스트 임베딩 (OPENAI_API_KEY 미설정 시 자동 스킵)
+        // commit/PR/issue 텍스트 임베딩
         if (!chunks.isEmpty()) {
-            log.info("GhArchiveBatchJob: {}개 청크 임베딩 시작", chunks.size());
+            log.info("GhArchiveBatchJob: {}개 청크 임베딩", chunks.size());
             try {
                 embeddingPipelineService.embedAndStore(chunks);
             } catch (Exception e) {
-                log.error("GhArchiveBatchJob 임베딩 실패", e);
+                log.error("임베딩 실패", e);
             }
         }
 
-        // 추적 repo 스코어 재계산
+        // repo_time 해당 bucket 행에 스코어 UPDATE
         repoRepository.findByTrackedTrue().forEach(repo -> {
             try {
-                scoreService.calculateAndSave(repo.getOwner(), repo.getName());
+                scoreService.calculateAndSave(repo.getOwner(), repo.getName(), prevHour);
             } catch (Exception e) {
                 log.warn("스코어 계산 실패 {}/{}: {}", repo.getOwner(), repo.getName(), e.getMessage());
             }

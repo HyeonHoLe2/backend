@@ -35,6 +35,16 @@ public class GhArchiveService {
 
     private static final DateTimeFormatter HOUR_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd-H");
 
+    // metrics 배열 인덱스
+    private static final int W_WATCH    = 0;
+    private static final int W_COMMIT   = 1;
+    private static final int W_PR_OPEN  = 2;
+    private static final int W_PR_MERGE = 3;
+    private static final int W_IS_OPEN  = 4;
+    private static final int W_IS_CLOSE = 5;
+    private static final int W_STAR     = 6;
+    private static final int W_RELEASE  = 7;
+
     private final GhArchiveProperties props;
     private final RepoRepository repoRepository;
     private final RepoHourlyMetricsRepository metricsRepository;
@@ -42,13 +52,13 @@ public class GhArchiveService {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     /**
-     * 특정 시간(hourBucket)의 GH Archive 파일을 처리.
-     * - 추적 중인 repo의 이벤트 → repo_hourly_metrics upsert
-     * - commit message / PR body / issue body → ChunkDocument 목록 반환 (임베딩용)
-     * - WatchEvent ≥ minWatch인 신규 repo → repos에 tracked=false로 등록
+     * 특정 시간의 GH Archive 파일 처리.
+     * - 추적 repo 이벤트 집계 → repo_time upsert
+     * - commit message / PR body / issue body → ChunkDocument 반환 (임베딩용)
+     * - WatchEvent ≥ threshold인 미추적 repo → repos 등록
      */
-    public List<ChunkDocument> processHour(LocalDateTime hourBucket) {
-        String fileName = hourBucket.format(HOUR_FMT) + ".json.gz";
+    public List<ChunkDocument> processHour(LocalDateTime bucket) {
+        String fileName = bucket.format(HOUR_FMT) + ".json.gz";
         String url = props.getBaseUrl() + "/" + fileName;
         log.info("GH Archive 처리 시작: {}", url);
 
@@ -57,8 +67,9 @@ public class GhArchiveService {
                 .map(r -> r.getOwner() + "/" + r.getName())
                 .collect(Collectors.toSet());
 
-        Map<String, int[]> metrics = new HashMap<>();       // fullName → [watch, push, pr, issue]
-        Map<String, Integer> watchCounts = new HashMap<>(); // 전체 대상, 발견용
+        // fullName → int[8]: watch, commit, prOpen, prMerge, issueOpen, issueClose, star, release
+        Map<String, int[]> metrics = new HashMap<>();
+        Map<String, Integer> watchCounts = new HashMap<>(); // 발견용 (전체 대상)
         List<ChunkDocument> chunks = new ArrayList<>();
 
         long lineCount = 0;
@@ -87,17 +98,18 @@ public class GhArchiveService {
             return List.of();
         }
 
-        log.info("GH Archive {}: {}줄 처리, metrics={}개 repo, chunks={}개 추출",
-                fileName, lineCount, metrics.size(), chunks.size());
+        log.info("GH Archive {}: {}줄, metrics {}개 repo, chunks {}개", fileName, lineCount, metrics.size(), chunks.size());
 
         // 추적 repo 메트릭 upsert
         for (Map.Entry<String, int[]> entry : metrics.entrySet()) {
             String[] parts = entry.getKey().split("/", 2);
             int[] m = entry.getValue();
-            metricsRepository.upsert(parts[0], parts[1], hourBucket, m[0], m[1], m[2], m[3]);
+            metricsRepository.upsert(parts[0], parts[1], bucket,
+                    m[W_WATCH], m[W_COMMIT], m[W_PR_OPEN], m[W_PR_MERGE],
+                    m[W_IS_OPEN], m[W_IS_CLOSE], m[W_STAR], m[W_RELEASE]);
         }
 
-        // WatchEvent ≥ threshold인 미추적 repo 후보 등록
+        // WatchEvent ≥ threshold인 미추적 repo 등록
         int discovered = 0;
         for (Map.Entry<String, Integer> entry : watchCounts.entrySet()) {
             String fullName = entry.getKey();
@@ -107,34 +119,27 @@ public class GhArchiveService {
                 try {
                     repoRepository.findByFullName(fullName).orElseGet(() ->
                             repoRepository.save(Repo.builder()
-                                    .fullName(fullName)
-                                    .owner(parts[0])
-                                    .name(parts[1])
-                                    .tracked(false)
-                                    .createdAt(LocalDateTime.now())
-                                    .build())
-                    );
+                                    .fullName(fullName).owner(parts[0]).name(parts[1])
+                                    .tracked(false).createdAt(LocalDateTime.now()).build()));
                     discovered++;
                 } catch (Exception e) {
                     log.warn("신규 repo 등록 실패 {}: {}", fullName, e.getMessage());
                 }
             }
         }
-        if (discovered > 0) {
-            log.info("GH Archive: 신규 repo 후보 {}개 발견 (watch≥{})", discovered, props.getMinWatchCountForDiscovery());
-        }
+        if (discovered > 0) log.info("GH Archive: 신규 repo 후보 {}개 (watch≥{})", discovered, props.getMinWatchCountForDiscovery());
 
         return chunks;
     }
 
-    // ─── private ──────────────────────────────────────────────
+    // ─── private ──────────────────────────────────────────
 
     private void processEvent(String line, Set<String> trackedRepos,
                               Map<String, int[]> metrics, Map<String, Integer> watchCounts,
                               List<ChunkDocument> chunks) {
         try {
             JsonNode event = objectMapper.readTree(line);
-            String type = event.path("type").asText();
+            String type     = event.path("type").asText();
             String fullName = event.path("repo").path("name").asText();
             if (fullName.isBlank()) return;
 
@@ -144,38 +149,49 @@ public class GhArchiveService {
 
             if (!trackedRepos.contains(fullName)) return;
 
-            // 메트릭 집계
-            int[] m = metrics.computeIfAbsent(fullName, k -> new int[4]);
+            int[] m = metrics.computeIfAbsent(fullName, k -> new int[8]);
+            JsonNode payload = event.path("payload");
+
             switch (type) {
-                case "WatchEvent"       -> m[0]++;
-                case "PushEvent"        -> m[1]++;
-                case "PullRequestEvent" -> m[2]++;
-                case "IssuesEvent"      -> m[3]++;
+                case "WatchEvent" -> { m[W_WATCH]++; m[W_STAR]++; }
+                case "PushEvent"  -> {
+                    // commit 수 = commits 배열 크기
+                    int commits = payload.path("commits").size();
+                    m[W_COMMIT] += Math.max(commits, 1);
+                }
+                case "PullRequestEvent" -> {
+                    String action = payload.path("action").asText();
+                    if ("opened".equals(action)) {
+                        m[W_PR_OPEN]++;
+                    } else if ("closed".equals(action)) {
+                        boolean merged = payload.path("pull_request").path("merged").asBoolean();
+                        if (merged) m[W_PR_MERGE]++;
+                    }
+                }
+                case "IssuesEvent" -> {
+                    String action = payload.path("action").asText();
+                    if ("opened".equals(action))      m[W_IS_OPEN]++;
+                    else if ("closed".equals(action)) m[W_IS_CLOSE]++;
+                }
+                case "ReleaseEvent" -> m[W_RELEASE]++;
             }
 
-            // 텍스트 청크 추출 (임베딩용)
-            chunks.addAll(extractChunks(event, type, fullName));
+            chunks.addAll(extractChunks(event, type, fullName, payload));
 
         } catch (Exception ignored) {
         }
     }
 
-    /**
-     * 이벤트 페이로드에서 임베딩할 텍스트를 ChunkDocument로 변환.
-     * PushEvent  → commit message
-     * PullRequestEvent → PR title + body
-     * IssuesEvent → issue title + body
-     */
-    private List<ChunkDocument> extractChunks(JsonNode event, String type, String fullName) {
+    private List<ChunkDocument> extractChunks(JsonNode event, String type,
+                                               String fullName, JsonNode payload) {
         String[] parts = fullName.split("/", 2);
         String owner = parts[0], name = parts[1];
         List<ChunkDocument> result = new ArrayList<>();
 
         switch (type) {
             case "PushEvent" -> {
-                JsonNode commits = event.path("payload").path("commits");
                 int idx = 0;
-                for (JsonNode commit : commits) {
+                for (JsonNode commit : payload.path("commits")) {
                     String sha     = commit.path("sha").asText();
                     String message = commit.path("message").asText().strip();
                     if (sha.isBlank() || message.isBlank()) continue;
@@ -191,38 +207,36 @@ public class GhArchiveService {
                 }
             }
             case "PullRequestEvent" -> {
-                JsonNode pr     = event.path("payload").path("pull_request");
-                String number   = pr.path("number").asText();
-                String title    = pr.path("title").asText().strip();
-                String body     = pr.path("body").asText().strip();
-                String htmlUrl  = pr.path("html_url").asText();
+                JsonNode pr    = payload.path("pull_request");
+                String number  = pr.path("number").asText();
+                String title   = pr.path("title").asText().strip();
+                String body    = pr.path("body").asText().strip();
+                String htmlUrl = pr.path("html_url").asText();
                 if (title.isBlank()) break;
-                String content  = body.isBlank() ? title : title + "\n\n" + body;
                 result.add(ChunkDocument.builder()
                         .repoOwner(owner).repoName(name)
                         .filePath("events/pull_request")
                         .chunkId(owner + "/" + name + "/pr/" + number)
                         .chunkIndex(0)
                         .heading(title)
-                        .content(content)
+                        .content(body.isBlank() ? title : title + "\n\n" + body)
                         .url(htmlUrl)
                         .build());
             }
             case "IssuesEvent" -> {
-                JsonNode issue  = event.path("payload").path("issue");
-                String number   = issue.path("number").asText();
-                String title    = issue.path("title").asText().strip();
-                String body     = issue.path("body").asText().strip();
-                String htmlUrl  = issue.path("html_url").asText();
+                JsonNode issue = payload.path("issue");
+                String number  = issue.path("number").asText();
+                String title   = issue.path("title").asText().strip();
+                String body    = issue.path("body").asText().strip();
+                String htmlUrl = issue.path("html_url").asText();
                 if (title.isBlank()) break;
-                String content  = body.isBlank() ? title : title + "\n\n" + body;
                 result.add(ChunkDocument.builder()
                         .repoOwner(owner).repoName(name)
                         .filePath("events/issue")
                         .chunkId(owner + "/" + name + "/issue/" + number)
                         .chunkIndex(0)
                         .heading(title)
-                        .content(content)
+                        .content(body.isBlank() ? title : title + "\n\n" + body)
                         .url(htmlUrl)
                         .build());
             }
