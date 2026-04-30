@@ -31,8 +31,9 @@ public class RepoBatchJob {
     private final RepoCollectorService repoCollectorService;
     private final GithubCollectorProperties props;
 
-    // 주 1회 (매주 일요일 새벽 3시) - README/doc 초기 수집용, 일상 수집은 GhArchiveBatchJob이 담당
-    @Scheduled(cron = "${github.collector.cron-expression:0 0 3 * * SUN}")
+    // TrendingRssBatchJob이 README 수집을 담당하므로 기본 비활성화 (-).
+    // 필요 시 github.collector.cron-expression 프로퍼티로 활성화.
+    @Scheduled(cron = "${github.collector.cron-expression:-}")
     public void run() {
         // GitHub Token 미설정 시 조기 종료
         if (props.getToken() == null || props.getToken().isBlank()) {

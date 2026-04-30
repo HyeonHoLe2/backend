@@ -1,6 +1,7 @@
 package gitgalaxy.backend.service;
 
 import gitgalaxy.backend.entity.Repo;
+import gitgalaxy.backend.model.ChunkDocument;
 import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,9 +34,14 @@ public class TrendingRssService {
     );
 
     private final RepoRepository repoRepository;
+    private final ChunkingService chunkingService;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    public int discoverAndUpsert() {
+    /**
+     * RSS 피드 파싱 → repo 발굴 upsert + README 즉시 수집 → ChunkDocument 반환.
+     * TrendingRssBatchJob이 반환된 청크를 임베딩 파이프라인으로 넘김.
+     */
+    public List<ChunkDocument> discoverAndUpsert() {
         List<String> fullNames = new ArrayList<>();
 
         for (String period : PERIODS) {
@@ -51,29 +57,67 @@ public class TrendingRssService {
             }
         }
 
+        List<ChunkDocument> allChunks = new ArrayList<>();
         int upserted = 0;
+
         for (String fullName : fullNames.stream().distinct().toList()) {
             String[] parts = fullName.split("/", 2);
             if (parts.length != 2) continue;
+            String owner = parts[0], name = parts[1];
+
             try {
                 Repo repo = repoRepository.findByFullName(fullName)
                         .orElse(Repo.builder()
                                 .fullName(fullName)
-                                .owner(parts[0])
-                                .name(parts[1])
+                                .owner(owner)
+                                .name(name)
                                 .createdAt(LocalDateTime.now())
                                 .build());
                 repo.setTracked(true);
                 repoRepository.save(repo);
                 upserted++;
+
+                // README fetch → chunk
+                List<ChunkDocument> chunks = fetchReadmeChunks(owner, name);
+                allChunks.addAll(chunks);
+
             } catch (Exception e) {
                 log.warn("repo upsert 실패 {}: {}", fullName, e.getMessage());
             }
         }
 
-        log.info("TrendingRss: {}개 후보 중 {}개 upsert", fullNames.size(), upserted);
-        return upserted;
+        log.info("TrendingRss: {}개 repo upsert, README 청크 {}개 추출", upserted, allChunks.size());
+        return allChunks;
     }
+
+    // ─── README fetch ──────────────────────────────────
+
+    /**
+     * raw.githubusercontent.com에서 README.md를 직접 다운로드 (토큰 불필요).
+     * main → master 순으로 시도, 둘 다 없으면 빈 리스트 반환.
+     */
+    private List<ChunkDocument> fetchReadmeChunks(String owner, String name) {
+        for (String branch : List.of("main", "master")) {
+            String rawUrl = "https://raw.githubusercontent.com/" + owner + "/" + name
+                    + "/" + branch + "/README.md";
+            try {
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create(rawUrl))
+                        .header("User-Agent", "GitGalaxy/1.0")
+                        .build();
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                if (resp.statusCode() == 200 && !resp.body().isBlank()) {
+                    String fileUrl = "https://github.com/" + owner + "/" + name + "#readme";
+                    return chunkingService.chunk(resp.body(), owner, name, "README.md", fileUrl);
+                }
+            } catch (Exception e) {
+                log.debug("README fetch 실패 {}/{}/{}: {}", owner, name, branch, e.getMessage());
+            }
+        }
+        return List.of();
+    }
+
+    // ─── RSS 파싱 ───────────────────────────────────────
 
     private List<String> fetchRepoNamesFromFeed(String url) throws Exception {
         HttpRequest req = HttpRequest.newBuilder()
