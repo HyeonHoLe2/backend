@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
 import gitgalaxy.backend.model.ChunkDocument;
 import gitgalaxy.backend.model.RepoInput;
+import gitgalaxy.backend.model.RepoMeta;
 import gitgalaxy.backend.model.RepoResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class RepoCollectorService {
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
     private final AiSummerize aiSummerize;
+    private final RepoSaveService repoSaveService;
 
     // ────────────────────────────────────────────────
     // Batch entry
@@ -96,8 +98,10 @@ public class RepoCollectorService {
         }
 
         try {
-            // ── default branch 조회 ──
-            String branch = githubClient.getDefaultBranch(input.owner(), input.repo());
+            // ── repo 메타 조회 + DB 저장 ──
+            RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
+            repoSaveService.saveOrUpdate(meta);
+            String branch = meta.defaultBranch();
             log.debug("{}: default branch = {}", input.fullName(), branch);
 
             // ── tree recursive 조회 ──

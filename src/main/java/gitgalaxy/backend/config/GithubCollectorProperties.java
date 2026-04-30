@@ -27,5 +27,5 @@ public class GithubCollectorProperties {
     private long retryDelayMs = 1000;
 
     /** Spring cron 표현식 (기본: 1시간마다) */
-    private String cronExpression = "0 0 * * * *";
+    private String cronExpression = "0 * * * * *";
 }

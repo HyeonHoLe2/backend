@@ -3,6 +3,7 @@ package gitgalaxy.backend.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
+import gitgalaxy.backend.model.RepoMeta;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -43,14 +44,34 @@ public class GithubClient {
     // Public API
     // ────────────────────────────────────────────────
 
-    /** repo의 default branch 이름 반환 */
-    public String getDefaultBranch(String owner, String repo) {
+    /** repo 메타데이터 전체 조회 (default branch 포함) */
+    public RepoMeta getRepoMeta(String owner, String repo) {
         String url = API_BASE + "/repos/" + owner + "/" + repo;
         String body = executeApiGet(url);
         try {
-            return objectMapper.readTree(body).get("default_branch").asText();
+            JsonNode node = objectMapper.readTree(body);
+            String primaryLanguage = node.path("language").isNull() ? null : node.path("language").asText();
+            JsonNode topicsNode = node.path("topics");
+            String topics = null;
+            if (topicsNode.isArray() && !topicsNode.isEmpty()) {
+                List<String> topicList = new ArrayList<>();
+                for (JsonNode t : topicsNode) topicList.add(t.asText());
+                topics = String.join(",", topicList);
+            }
+            return new RepoMeta(
+                    node.path("full_name").asText(),
+                    node.path("owner").path("login").asText(),
+                    node.path("owner").path("id").asText(),
+                    node.path("name").asText(),
+                    node.path("html_url").asText(),
+                    primaryLanguage,
+                    topics,
+                    node.path("stargazers_count").asLong(0),
+                    node.path("forks_count").asLong(0),
+                    node.path("default_branch").asText("main")
+            );
         } catch (Exception e) {
-            throw new RuntimeException("default_branch 파싱 실패: " + url, e);
+            throw new RuntimeException("repo meta 파싱 실패: " + url, e);
         }
     }
 
