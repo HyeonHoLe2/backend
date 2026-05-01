@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.sql.Timestamp;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -105,7 +106,7 @@ public class GhArchiveService {
             String[] parts = entry.getKey().split("/", 2);
             int[] m = entry.getValue();
             try {
-                metricsRepository.upsert(parts[0], parts[1], bucket,
+                metricsRepository.upsert(parts[0], parts[1], Timestamp.valueOf(bucket),
                         m[W_WATCH], m[W_COMMIT], m[W_PR_OPEN], m[W_PR_MERGE],
                         m[W_IS_OPEN], m[W_IS_CLOSE], m[W_STAR], m[W_RELEASE]);
             } catch (Exception e) {

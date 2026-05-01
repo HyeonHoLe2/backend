@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,7 +29,7 @@ public class ScoreService {
         double brightnessScore = Math.min(100.0, activeScore * 0.7 + healthScore * 0.3);
         double sizeScore       = healthScore;
 
-        metricsRepository.updateScores(owner, name, bucket, activeScore, healthScore, brightnessScore, sizeScore);
+        metricsRepository.updateScores(owner, name, Timestamp.valueOf(bucket), activeScore, healthScore, brightnessScore, sizeScore);
         log.debug("score {}/{} @{}: active={:.1f} health={:.1f}", owner, name, bucket, activeScore, healthScore);
     }
 

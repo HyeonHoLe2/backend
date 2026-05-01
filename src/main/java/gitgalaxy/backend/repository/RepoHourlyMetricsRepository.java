@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -39,7 +40,7 @@ public interface RepoHourlyMetricsRepository extends JpaRepository<RepoHourlyMet
             """, nativeQuery = true)
     void upsert(@Param("owner") String owner,
                 @Param("name") String name,
-                @Param("bucket") LocalDateTime bucket,
+                @Param("bucket") Timestamp bucket,
                 @Param("watch") int watch,
                 @Param("commitCount") int commitCount,
                 @Param("prCreated") int prCreated,
@@ -63,7 +64,7 @@ public interface RepoHourlyMetricsRepository extends JpaRepository<RepoHourlyMet
             """, nativeQuery = true)
     void updateScores(@Param("owner") String owner,
                       @Param("name") String name,
-                      @Param("bucket") LocalDateTime bucket,
+                      @Param("bucket") Timestamp bucket,
                       @Param("activeScore") double activeScore,
                       @Param("healthScore") double healthScore,
                       @Param("brightnessScore") double brightnessScore,
