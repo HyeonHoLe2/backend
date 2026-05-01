@@ -31,7 +31,13 @@ public class RepoBatchJob {
     private final RepoCollectorService repoCollectorService;
     private final GithubCollectorProperties props;
 
+<<<<<<< feat/2-scheduler
+    // TrendingRssBatchJob이 README 수집을 담당하므로 기본 비활성화 (-).
+    // 필요 시 github.collector.cron-expression 프로퍼티로 활성화.
+    @Scheduled(cron = "${github.collector.cron-expression:-}")
+=======
     @Scheduled(cron = "${github.collector.cron-expression:0 * * * * *}")
+>>>>>>> main
     public void run() {
         // GitHub Token 미설정 시 조기 종료
         if (props.getToken() == null || props.getToken().isBlank()) {

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: gitgalaxy-postgres-dev
     environment:
       POSTGRES_DB: gitgalaxy
@@ -11,6 +11,8 @@ services:
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
 
+<<<<<<< feat/2-scheduler
+=======
   backend:
     build: .
     container_name: gitgalaxy-backend-dev
@@ -24,5 +26,6 @@ services:
     ports:
       - "8080:8080"
 
+>>>>>>> main
 volumes:
   postgres-dev-data:

@@ -12,7 +12,10 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+<<<<<<< feat/2-scheduler
+=======
 
+>>>>>>> main
 public class Repo {
 
     @Id

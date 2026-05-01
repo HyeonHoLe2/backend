@@ -3,10 +3,12 @@ package gitgalaxy.backend.service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
+import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.model.ChunkDocument;
 import gitgalaxy.backend.model.RepoInput;
 import gitgalaxy.backend.model.RepoMeta;
 import gitgalaxy.backend.model.RepoResult;
+import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,8 +47,13 @@ public class RepoCollectorService {
     private final ChunkingService chunkingService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+<<<<<<< feat/2-scheduler
+    private final RepoRepository repoRepository;
+    private final EmbeddingPipelineService embeddingPipelineService;
+=======
     private final AiSummerize aiSummerize;
     private final RepoSaveService repoSaveService;
+>>>>>>> main
 
     // ────────────────────────────────────────────────
     // Batch entry
@@ -98,11 +105,18 @@ public class RepoCollectorService {
         }
 
         try {
+<<<<<<< feat/2-scheduler
+            // ── repo 메타 조회 (branch + star + description) ──
+            RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
+            String branch = meta.defaultBranch();
+            log.debug("{}: branch={}, stars={}", input.fullName(), branch, meta.stargazersCount());
+=======
             // ── repo 메타 조회 + DB 저장 ──
             RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
             repoSaveService.saveOrUpdate(meta);
             String branch = meta.defaultBranch();
             log.debug("{}: default branch = {}", input.fullName(), branch);
+>>>>>>> main
 
             // ── tree recursive 조회 ──
             List<String> allPaths = githubClient.getRepoTree(input.owner(), input.repo(), branch);
@@ -130,8 +144,18 @@ public class RepoCollectorService {
 
             // ── JSONL 저장 ──
             storageService.saveChunks(input.owner(), input.repo(), allChunks);
+<<<<<<< feat/2-scheduler
+
+            // ── Repo 엔티티 DB 저장 ──
+            upsertRepo(input, meta);
+
+            // ── 임베딩 파이프라인 (OPENAI_API_KEY 설정 시) ──
+            embeddingPipelineService.embedAndStore(allChunks);
+
+=======
             storageService.saveFile(input.owner(), input.repo(), contents);
             aiSummerize.summarize(input.owner(), input.repo());
+>>>>>>> main
             return RepoResult.builder()
                     .owner(input.owner()).repo(input.repo())
                     .status("success")
@@ -154,18 +178,50 @@ public class RepoCollectorService {
     }
 
     // ────────────────────────────────────────────────
+    // Repo 엔티티 upsert
+    // ────────────────────────────────────────────────
+
+    private void upsertRepo(RepoInput input, RepoMeta meta) {
+        Repo repo = repoRepository.findByFullName(input.fullName())
+                .orElse(Repo.builder()
+                        .fullName(input.fullName())
+                        .owner(input.owner())
+                        .name(input.repo())
+                        .createdAt(LocalDateTime.now())
+                        .build());
+
+        repo.setDescription(meta.description());
+        repo.setStarCount(meta.stargazersCount());
+        repo.setDefaultBranch(meta.defaultBranch());
+        repo.setTracked(true);
+        repo.setLastCollectedAt(LocalDateTime.now());
+        repoRepository.save(repo);
+    }
+
+    // ────────────────────────────────────────────────
     // Repo 목록 로드
     // ────────────────────────────────────────────────
 
     public List<RepoInput> loadRepoList() {
+        // 1. DB에서 추적 중인 repo 로드
+        List<Repo> trackedRepos = repoRepository.findByTrackedTrue();
+        if (!trackedRepos.isEmpty()) {
+            log.info("DB에서 추적 repo {}개 로드", trackedRepos.size());
+            return trackedRepos.stream()
+                    .map(r -> new RepoInput(r.getOwner(), r.getName()))
+                    .toList();
+        }
+
+        // 2. fallback: repos.json / repos.csv
         String pathStr = props.getRepoListPath();
         Path filePath = Path.of(pathStr);
 
         if (!Files.exists(filePath)) {
-            log.warn("repo 목록 파일을 찾을 수 없습니다: {}", filePath.toAbsolutePath());
+            log.warn("DB에 tracked repo 없음, repo 목록 파일도 없음: {}", filePath.toAbsolutePath());
             return List.of();
         }
 
+        log.info("DB에 tracked repo 없음 → 파일에서 로드: {}", filePath.toAbsolutePath());
         try {
             if (pathStr.endsWith(".json")) {
                 return objectMapper.readValue(filePath.toFile(), new TypeReference<List<RepoInput>>() {});
