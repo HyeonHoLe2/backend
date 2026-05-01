@@ -28,9 +28,10 @@ public class TrendingRssService {
     private static final String RSS_BASE = "https://mshibanami.github.io/GitHubTrendingRSS";
 
     private static final List<String> PERIODS = List.of("daily", "weekly");
+    // RSS 피드 URL은 소문자 언어명 사용 (대문자 → 404)
     private static final List<String> LANGUAGES = List.of(
-            "", "Python", "JavaScript", "TypeScript", "Go", "Rust",
-            "Java", "C%2B%2B", "Kotlin", "Swift"
+            "python", "javascript", "typescript", "go", "rust",
+            "java", "c%2B%2B", "kotlin", "swift"
     );
 
     private final RepoRepository repoRepository;
