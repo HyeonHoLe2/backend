@@ -73,12 +73,27 @@ public interface RepoHourlyMetricsRepository extends JpaRepository<RepoHourlyMet
     List<RepoHourlyMetrics> findByRepoOwnerAndRepoNameAndBucketBetweenOrderByBucketAsc(
             String repoOwner, String repoName, LocalDateTime from, LocalDateTime to);
 
-    /** 최신 스코어 기준 상위 repo (트렌딩 API용) */
+    /** 단일 repo 최신 bucket 1건 */
+    java.util.Optional<RepoHourlyMetrics> findTopByRepoOwnerAndRepoNameOrderByBucketDesc(
+            String repoOwner, String repoName);
+
+    /** repo별 최신 bucket 1건씩 전체 (목록 스코어 enrichment용) */
     @Query(value = """
-            SELECT DISTINCT ON (repo_owner, repo_name)
-                *
+            SELECT DISTINCT ON (repo_owner, repo_name) *
             FROM repo_time
             ORDER BY repo_owner, repo_name, bucket DESC
             """, nativeQuery = true)
     List<RepoHourlyMetrics> findLatestPerRepo();
+
+    /** brightnessScore 기준 상위 N개 (트렌딩 API용) */
+    @Query(value = """
+            SELECT * FROM (
+                SELECT DISTINCT ON (repo_owner, repo_name) *
+                FROM repo_time
+                ORDER BY repo_owner, repo_name, bucket DESC
+            ) latest
+            ORDER BY brightness_score DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<RepoHourlyMetrics> findTrending(@Param("limit") int limit);
 }
