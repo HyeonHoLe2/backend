@@ -104,9 +104,13 @@ public class GhArchiveService {
         for (Map.Entry<String, int[]> entry : metrics.entrySet()) {
             String[] parts = entry.getKey().split("/", 2);
             int[] m = entry.getValue();
-            metricsRepository.upsert(parts[0], parts[1], bucket,
-                    m[W_WATCH], m[W_COMMIT], m[W_PR_OPEN], m[W_PR_MERGE],
-                    m[W_IS_OPEN], m[W_IS_CLOSE], m[W_STAR], m[W_RELEASE]);
+            try {
+                metricsRepository.upsert(parts[0], parts[1], bucket,
+                        m[W_WATCH], m[W_COMMIT], m[W_PR_OPEN], m[W_PR_MERGE],
+                        m[W_IS_OPEN], m[W_IS_CLOSE], m[W_STAR], m[W_RELEASE]);
+            } catch (Exception e) {
+                log.warn("repo_time upsert 실패 {}: {}", entry.getKey(), e.getMessage());
+            }
         }
 
         // WatchEvent ≥ threshold인 미추적 repo 등록

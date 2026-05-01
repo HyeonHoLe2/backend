@@ -8,6 +8,7 @@ import gitgalaxy.backend.service.ScoreService;
 import gitgalaxy.backend.service.TrendingRssService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -71,5 +72,12 @@ public class AdminController {
             counts[0]++;
         });
         return Map.of("scored", counts[0]);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleError(Exception e) {
+        log.error("AdminController 에러", e);
+        return ResponseEntity.internalServerError()
+                .body(Map.of("error", e.getClass().getSimpleName(), "message", e.getMessage() != null ? e.getMessage() : ""));
     }
 }
