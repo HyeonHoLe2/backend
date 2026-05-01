@@ -17,14 +17,12 @@ public class RepoSaveService {
     public Repo saveOrUpdate(RepoMeta meta) {
         Repo repo = repoRepository.findByFullName(meta.fullName()).orElseGet(Repo::new);
         repo.setFullName(meta.fullName());
-        repo.setOwnerName(meta.ownerName());
-        repo.setOwnerId(meta.ownerId());
-        repo.setRepoName(meta.repoName());
-        repo.setRepoUrl(meta.repoUrl());
-        repo.setPrimaryLanguage(meta.primaryLanguage());
-        repo.setTopics(meta.topics());
-        repo.setStarsTotal(meta.starsTotal());
-        repo.setForksTotal(meta.forksTotal());
+        repo.setOwner(meta.ownerName());
+        repo.setName(meta.repoName());
+        repo.setLanguage(meta.primaryLanguage());
+        repo.setStarCount((int) meta.starsTotal().longValue());
+        repo.setDefaultBranch(meta.defaultBranch());
+        repo.setTracked(true);
         return repoRepository.save(repo);
     }
 }
