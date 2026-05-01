@@ -44,12 +44,17 @@ public class GithubClient {
     // Public API
     // ────────────────────────────────────────────────
 
+<<<<<<< feat/2-scheduler
     /** repo 메타 정보 반환 (defaultBranch, description, stargazersCount) */
+=======
+    /** repo 메타데이터 전체 조회 (default branch 포함) */
+>>>>>>> main
     public RepoMeta getRepoMeta(String owner, String repo) {
         String url = API_BASE + "/repos/" + owner + "/" + repo;
         String body = executeApiGet(url);
         try {
             JsonNode node = objectMapper.readTree(body);
+<<<<<<< feat/2-scheduler
             return new RepoMeta(
                     node.path("default_branch").asText("main"),
                     node.path("description").asText(""),
@@ -57,6 +62,30 @@ public class GithubClient {
             );
         } catch (Exception e) {
             throw new RuntimeException("RepoMeta 파싱 실패: " + url, e);
+=======
+            String primaryLanguage = node.path("language").isNull() ? null : node.path("language").asText();
+            JsonNode topicsNode = node.path("topics");
+            String topics = null;
+            if (topicsNode.isArray() && !topicsNode.isEmpty()) {
+                List<String> topicList = new ArrayList<>();
+                for (JsonNode t : topicsNode) topicList.add(t.asText());
+                topics = String.join(",", topicList);
+            }
+            return new RepoMeta(
+                    node.path("full_name").asText(),
+                    node.path("owner").path("login").asText(),
+                    node.path("owner").path("id").asText(),
+                    node.path("name").asText(),
+                    node.path("html_url").asText(),
+                    primaryLanguage,
+                    topics,
+                    node.path("stargazers_count").asLong(0),
+                    node.path("forks_count").asLong(0),
+                    node.path("default_branch").asText("main")
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("repo meta 파싱 실패: " + url, e);
+>>>>>>> main
         }
     }
 

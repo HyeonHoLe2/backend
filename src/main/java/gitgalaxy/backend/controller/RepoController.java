@@ -1,5 +1,6 @@
 package gitgalaxy.backend.controller;
 
+<<<<<<< feat/2-scheduler
 import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.entity.RepoHourlyMetrics;
 import gitgalaxy.backend.model.RepoListItemDto;
@@ -25,11 +26,26 @@ import java.util.stream.Collectors;
  * GET /repos/{owner}/{repo}/explain       → RAG 설명 (?q=질문)
  * GET /repos/search                       → 글로벌 RAG 검색 (?q=질문)
  */
+=======
+import gitgalaxy.backend.model.RepoResponse;
+import gitgalaxy.backend.service.RepoService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+>>>>>>> main
 @RestController
 @RequestMapping("/repos")
 @RequiredArgsConstructor
 public class RepoController {
 
+<<<<<<< feat/2-scheduler
     private final RepoRepository repoRepository;
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RagService ragService;
@@ -119,5 +135,19 @@ public class RepoController {
     public ResponseEntity<Map<String, String>> handleError(Exception e) {
         return ResponseEntity.internalServerError()
                 .body(Map.of("error", e.getMessage()));
+=======
+    private final RepoService repoService;
+
+    @GetMapping("/search")
+    public ResponseEntity<List<RepoResponse>> search(@RequestParam String q) {
+        return ResponseEntity.ok(repoService.search(q));
+    }
+
+    @GetMapping("/{owner}/{repo}")
+    public ResponseEntity<RepoResponse> getRepo(
+            @PathVariable String owner,
+            @PathVariable String repo) {
+        return ResponseEntity.ok(repoService.getRepo(owner, repo));
+>>>>>>> main
     }
 }

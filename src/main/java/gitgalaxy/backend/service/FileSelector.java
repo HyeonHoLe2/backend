@@ -24,15 +24,20 @@ import java.util.stream.Collectors;
 public class FileSelector {
 
     private static final Set<String> EXCLUDED_FILENAMES = Set.of(
-            "changelog.md", "changes.md", "history.md", "license.md",
-            "licence.md", "contributing.md", "code_of_conduct.md",
+            "changelog.md", "changes.md", "history.md",
+            "license.md", "licence.md",
+            "contributing.md", "code_of_conduct.md",
             "security.md", "authors.md", "maintainers.md",
-            "codeowners", "funding.yml"
+            "codeowners", "funding.yml",
+            "agents.md",
+            "pull_request_template.md",
+            "issue_template.md",
+            "support.md",
+            "governance.md"
     );
 
     private static final List<String> INCLUDED_DIR_PREFIXES = List.of(
             "docs/", "doc/", "documentation/",
-            "examples/", "example/",
             "guides/", "guide/",
             "tutorial/", "tutorials/",
             "wiki/"
@@ -40,12 +45,16 @@ public class FileSelector {
 
     private static final List<String> EXCLUDED_DIR_PREFIXES = List.of(
             "node_modules/", "vendor/", "build/", "dist/",
-            ".github/", ".git/"
+            ".github/", ".git/",
+            "scripts/", "ci/", ".circleci/", ".github/workflows/"
     );
 
     private static final List<String> EXCLUDED_DIR_CONTAINS = List.of(
             "/node_modules/", "/vendor/", "/test/", "/tests/",
-            "/spec/", "/__tests__/", "/build/", "/dist/"
+            "/spec/", "/__tests__/", "/build/", "/dist/",
+            "/mock/", "/mocks/",
+            "/fixtures/",
+            "/coverage/"
     );
 
     private static final Set<String> INCLUDED_EXTENSIONS = Set.of(".md", ".mdx", ".rst");

@@ -47,8 +47,13 @@ public class RepoCollectorService {
     private final ChunkingService chunkingService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+<<<<<<< feat/2-scheduler
     private final RepoRepository repoRepository;
     private final EmbeddingPipelineService embeddingPipelineService;
+=======
+    private final AiSummerize aiSummerize;
+    private final RepoSaveService repoSaveService;
+>>>>>>> main
 
     // ────────────────────────────────────────────────
     // Batch entry
@@ -100,10 +105,18 @@ public class RepoCollectorService {
         }
 
         try {
+<<<<<<< feat/2-scheduler
             // ── repo 메타 조회 (branch + star + description) ──
             RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
             String branch = meta.defaultBranch();
             log.debug("{}: branch={}, stars={}", input.fullName(), branch, meta.stargazersCount());
+=======
+            // ── repo 메타 조회 + DB 저장 ──
+            RepoMeta meta = githubClient.getRepoMeta(input.owner(), input.repo());
+            repoSaveService.saveOrUpdate(meta);
+            String branch = meta.defaultBranch();
+            log.debug("{}: default branch = {}", input.fullName(), branch);
+>>>>>>> main
 
             // ── tree recursive 조회 ──
             List<String> allPaths = githubClient.getRepoTree(input.owner(), input.repo(), branch);
@@ -114,9 +127,11 @@ public class RepoCollectorService {
 
             // ── 파일별 다운로드 & chunking ──
             List<ChunkDocument> allChunks = new ArrayList<>();
+            List<String> contents = new ArrayList<>();
             for (String filePath : docPaths) {
                 try {
                     String content = githubClient.getRawContent(input.owner(), input.repo(), branch, filePath);
+                    contents.add(content);
                     String fileUrl = buildGithubUrl(input.owner(), input.repo(), branch, filePath);
                     List<ChunkDocument> chunks = chunkingService.chunk(
                             content, input.owner(), input.repo(), filePath, fileUrl);
@@ -129,6 +144,7 @@ public class RepoCollectorService {
 
             // ── JSONL 저장 ──
             storageService.saveChunks(input.owner(), input.repo(), allChunks);
+<<<<<<< feat/2-scheduler
 
             // ── Repo 엔티티 DB 저장 ──
             upsertRepo(input, meta);
@@ -136,6 +152,10 @@ public class RepoCollectorService {
             // ── 임베딩 파이프라인 (OPENAI_API_KEY 설정 시) ──
             embeddingPipelineService.embedAndStore(allChunks);
 
+=======
+            storageService.saveFile(input.owner(), input.repo(), contents);
+            aiSummerize.summarize(input.owner(), input.repo());
+>>>>>>> main
             return RepoResult.builder()
                     .owner(input.owner()).repo(input.repo())
                     .status("success")
