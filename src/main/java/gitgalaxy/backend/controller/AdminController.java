@@ -65,8 +65,9 @@ public class AdminController {
     public Map<String, Object> recalculateScores() {
         log.info("스코어 재계산 수동 트리거");
         long[] counts = {0};
+        LocalDateTime bucket = LocalDateTime.now().minusHours(1).withMinute(0).withSecond(0).withNano(0);
         repoRepository.findByTrackedTrue().forEach(repo -> {
-            scoreService.calculateAndSave(repo.getOwner(), repo.getName());
+            scoreService.calculateAndSave(repo.getOwner(), repo.getName(), bucket);
             counts[0]++;
         });
         return Map.of("scored", counts[0]);
