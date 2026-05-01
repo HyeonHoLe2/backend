@@ -13,22 +13,5 @@ services:
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
 
-  backend:
-    build: .
-    container_name: gitgalaxy-backend-dev
-    depends_on:
-      - postgres
-    env_file:
-      - .env
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "8080:8080"
-
 volumes:
   postgres-dev-data:
