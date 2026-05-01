@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class RepoSaveService {
@@ -14,15 +16,17 @@ public class RepoSaveService {
     private final RepoRepository repoRepository;
 
     @Transactional
-    public Repo saveOrUpdate(RepoMeta meta) {
-        Repo repo = repoRepository.findByFullName(meta.fullName()).orElseGet(Repo::new);
-        repo.setFullName(meta.fullName());
-        repo.setOwner(meta.ownerName());
-        repo.setName(meta.repoName());
-        repo.setLanguage(meta.primaryLanguage());
-        repo.setStarCount((int) meta.starsTotal().longValue());
+    public Repo saveOrUpdate(String owner, String repoName, RepoMeta meta) {
+        String fullName = owner + "/" + repoName;
+        Repo repo = repoRepository.findByFullName(fullName).orElseGet(Repo::new);
+        repo.setFullName(fullName);
+        repo.setOwner(owner);
+        repo.setName(repoName);
+        repo.setDescription(meta.description());
+        repo.setStarCount(meta.stargazersCount());
         repo.setDefaultBranch(meta.defaultBranch());
         repo.setTracked(true);
+        repo.setLastCollectedAt(LocalDateTime.now());
         return repoRepository.save(repo);
     }
 }
