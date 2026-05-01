@@ -15,6 +15,9 @@ public class GeminiProperties {
     /** https://ai.google.dev/gemini-api/docs/models */
     private String model = "gemini-2.5-flash";
 
+    /** 임베딩 모델 (768차원) */
+    private String embeddingModel = "gemini-embedding-2";
+
     /** 503/429 등 재시도 최대 횟수 */
     private int maxRetries = 5;
 

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS chunk_embeddings (
     heading     TEXT,
     content     TEXT,
     url         TEXT,
-    embedding   vector(1536),
+    embedding   vector(3072),
     embedded_at TIMESTAMP
 );
 

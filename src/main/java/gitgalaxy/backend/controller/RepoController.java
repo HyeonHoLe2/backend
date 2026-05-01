@@ -1,14 +1,20 @@
 package gitgalaxy.backend.controller;
 
-<<<<<<< feat/2-scheduler
 import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.entity.RepoHourlyMetrics;
+
 import gitgalaxy.backend.model.RepoListItemDto;
+import gitgalaxy.backend.model.RepoResponse;
 import gitgalaxy.backend.model.TimelinePointDto;
+
 import gitgalaxy.backend.repository.RepoHourlyMetricsRepository;
 import gitgalaxy.backend.repository.RepoRepository;
+
 import gitgalaxy.backend.service.RagService;
+import gitgalaxy.backend.service.RepoService;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,38 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * GET /repos                              → tracked repo 전체 목록 (스코어 포함)
- * GET /repos/trending                     → brightnessScore 상위 목록 (?limit=50)
- * GET /repos/{owner}/{repo}               → repo 상세 + 최신 스코어
- * GET /repos/{owner}/{repo}/timeline      → 시간별 메트릭/스코어 (?hours=24)
- * GET /repos/{owner}/{repo}/explain       → RAG 설명 (?q=질문)
- * GET /repos/search                       → 글로벌 RAG 검색 (?q=질문)
- */
-=======
-import gitgalaxy.backend.model.RepoResponse;
-import gitgalaxy.backend.service.RepoService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-
->>>>>>> main
 @RestController
 @RequestMapping("/repos")
 @RequiredArgsConstructor
 public class RepoController {
 
-<<<<<<< feat/2-scheduler
+
     private final RepoRepository repoRepository;
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RagService ragService;
-
+    private final RepoService repoService;
     @GetMapping
     public List<RepoListItemDto> list() {
         Map<String, RepoHourlyMetrics> latestMap = metricsRepository.findLatestPerRepo()
@@ -125,8 +109,8 @@ public class RepoController {
         return Map.of("repo", owner + "/" + repo, "question", q, "answer", answer);
     }
 
-    @GetMapping("/search")
-    public Map<String, String> search(@RequestParam String q) {
+    @GetMapping("/rag/search")
+    public Map<String, String> rag_search(@RequestParam String q) {
         String answer = ragService.explainGlobal(q);
         return Map.of("question", q, "answer", answer);
     }
@@ -135,19 +119,13 @@ public class RepoController {
     public ResponseEntity<Map<String, String>> handleError(Exception e) {
         return ResponseEntity.internalServerError()
                 .body(Map.of("error", e.getMessage()));
-=======
-    private final RepoService repoService;
+    }
+
 
     @GetMapping("/search")
     public ResponseEntity<List<RepoResponse>> search(@RequestParam String q) {
         return ResponseEntity.ok(repoService.search(q));
     }
 
-    @GetMapping("/{owner}/{repo}")
-    public ResponseEntity<RepoResponse> getRepo(
-            @PathVariable String owner,
-            @PathVariable String repo) {
-        return ResponseEntity.ok(repoService.getRepo(owner, repo));
->>>>>>> main
-    }
+
 }

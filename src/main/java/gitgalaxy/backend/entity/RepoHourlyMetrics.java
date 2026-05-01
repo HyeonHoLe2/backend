@@ -22,27 +22,54 @@ public class RepoHourlyMetrics {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "repo_owner")
     private String repoOwner;
+
+    @Column(name = "repo_name")
     private String repoName;
 
-    private LocalDateTime bucket;   // hour 단위 truncate (예: 2025-04-29T14:00)
+    @Column(name = "bucket")
+    private LocalDateTime bucket;
 
-    // ── 이벤트 집계 ──────────────────────────────────
-    private int watch;              // WatchEvent (스타 이벤트)
-    private int commitCount;        // PushEvent 커밋 수
-    private int prCreated;          // PullRequestEvent action=opened
-    private int prMerged;           // PullRequestEvent action=closed + merged=true
-    private int issueOpened;        // IssuesEvent action=opened
-    private int issueClosed;        // IssuesEvent action=closed
-    private int starCount;          // 누적 스타 수 (WatchEvent 누계)
-    private int releaseCount;       // ReleaseEvent
+    @Column(name = "watch")
+    private int watch;
 
-    // ── 스코어 (ERD repo_time 통합) ──────────────────
-    private double activeScore;     // 단기 활동 지수 (0~100)
-    private double healthScore;     // 장기 건강 지수 (0~100)
-    private double brightnessScore; // 3D 별 밝기 (0~100)
-    private double sizeScore;       // 3D 별 크기 (0~100)
+    @Column(name = "commit_count")
+    private int commitCount;
 
+    @Column(name = "pr_created")
+    private int prCreated;
+
+    @Column(name = "pr_merged")
+    private int prMerged;
+
+    @Column(name = "issue_opened")
+    private int issueOpened;
+
+    @Column(name = "issue_closed")
+    private int issueClosed;
+
+    @Column(name = "star_count")
+    private int starCount;
+
+    @Column(name = "release_count")
+    private int releaseCount;
+
+    @Column(name = "active_score")
+    private double activeScore;
+
+    @Column(name = "health_score")
+    private double healthScore;
+
+    @Column(name = "brightness_score")
+    private double brightnessScore;
+
+    @Column(name = "size_score")
+    private double sizeScore;
+
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

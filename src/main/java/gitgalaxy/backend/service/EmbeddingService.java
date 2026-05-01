@@ -1,39 +1,27 @@
 package gitgalaxy.backend.service;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import gitgalaxy.backend.config.OpenAiProperties;
+import com.google.genai.Client;
+import com.google.genai.types.EmbedContentResponse;
+import gitgalaxy.backend.config.GeminiProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.Map;
+import java.util.List;
 
 /**
- * OpenAI text-embedding-3-small API 호출 → float[] 반환.
- * 1536 차원 고정 (pgvector 스키마와 일치).
+ * Gemini text-embedding-004 SDK 호출 → float[] 반환.
+ * 768 차원 고정 (pgvector 스키마와 일치).
  */
 @Service
 @Slf4j
 public class EmbeddingService {
 
-    private static final String EMBEDDING_URL = "https://api.openai.com/v1/embeddings";
-    static final int DIMS = 1536;
+    static final int DIMS = 3072;
 
-    private final OpenAiProperties props;
-    private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    private final GeminiProperties props;
 
-    public EmbeddingService(OpenAiProperties props, ObjectMapper objectMapper) {
+    public EmbeddingService(GeminiProperties props) {
         this.props = props;
-        this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
     }
 
     public boolean isConfigured() {
@@ -42,38 +30,30 @@ public class EmbeddingService {
 
     public float[] embed(String text) {
         try {
-            // OpenAI 토큰 한도 초과 방지 (≈ 8191 tokens)
             String input = text.length() > 8000 ? text.substring(0, 8000) : text;
 
-            String body = objectMapper.writeValueAsString(
-                    Map.of("model", props.getEmbeddingModel(), "input", input));
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(EMBEDDING_URL))
-                    .header("Authorization", "Bearer " + props.getApiKey())
-                    .header("Content-Type", "application/json")
-                    .timeout(Duration.ofSeconds(60))
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
+            Client client = Client.builder()
+                    .apiKey(props.getApiKey())
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            EmbedContentResponse response = client.models.embedContent(
+                    props.getEmbeddingModel(),
+                    input,
+                    null
+            );
 
-            if (response.statusCode() != 200) {
-                throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
-            }
+            List<Float> values = response.embeddings()
+                    .orElseThrow(() -> new RuntimeException("임베딩 결과 없음"))
+                    .get(0)
+                    .values()
+                    .orElseThrow(() -> new RuntimeException("임베딩 값 없음"));
 
-            JsonNode embeddingNode = objectMapper.readTree(response.body())
-                    .path("data").get(0).path("embedding");
-
-            float[] vector = new float[DIMS];
-            for (int i = 0; i < DIMS; i++) {
-                vector[i] = (float) embeddingNode.get(i).asDouble();
+            float[] vector = new float[values.size()];
+            for (int i = 0; i < values.size(); i++) {
+                vector[i] = values.get(i);
             }
             return vector;
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Embedding 인터럽트", e);
         } catch (Exception e) {
             throw new RuntimeException("Embedding 실패: " + e.getMessage(), e);
         }

@@ -28,7 +28,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**"
                         ).permitAll()
                         .requestMatchers("/users/me/**").authenticated()
-                        .requestMatchers("/users/**").permitAll()
+                        .requestMatchers("/users/**", "/repos/**", "/auth/me", "/auth/logout", "/admin/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
