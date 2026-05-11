@@ -25,6 +25,7 @@ public class RepoSaveService {
         repo.setDescription(meta.description());
         repo.setStarCount(meta.stargazersCount());
         repo.setDefaultBranch(meta.defaultBranch());
+        repo.setLanguage(meta.language());
         repo.setTracked(true);
         repo.setLastCollectedAt(LocalDateTime.now());
         return repoRepository.save(repo);

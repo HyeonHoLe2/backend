@@ -22,15 +22,27 @@ public class ScoreService {
      * GhArchiveBatchJob이 upsert 직후 호출.
      */
     public void calculateAndSave(String owner, String name, LocalDateTime bucket) {
-        LocalDateTime now = bucket;
+        LocalDateTime targetBucket = bucket;
 
-        double activeScore     = calcActivityScore(owner, name, now.minusHours(24), now);
-        double healthScore     = calcHealthScore(owner, name, now.minusDays(30), now);
-        double brightnessScore = Math.min(100.0, activeScore * 0.7 + healthScore * 0.3);
-        double sizeScore       = healthScore;
+        if (targetBucket == null) {
+            targetBucket = metricsRepository
+                    .findTopByRepoOwnerAndRepoNameOrderByBucketDesc(owner, name)
+                    .map(RepoHourlyMetrics::getBucket)
+                    .orElse(null);
+        }
 
-        metricsRepository.updateScores(owner, name, Timestamp.valueOf(bucket), activeScore, healthScore, brightnessScore, sizeScore);
-        log.debug("score {}/{} @{}: active={:.1f} health={:.1f}", owner, name, bucket, activeScore, healthScore);
+        if (targetBucket == null) {
+            log.debug("score {}/{}: repo_time 데이터 없음 — 스킵", owner, name);
+            return;
+        }
+
+        double activeScore     = calcActivityScore(owner, name, targetBucket.minusHours(24), targetBucket);
+        double healthScore     = calcHealthScore(owner, name, targetBucket.minusDays(7), targetBucket);
+        double sizeScore       = calcHealthScore(owner, name, targetBucket.minusDays(30), targetBucket);
+        double brightnessScore = Math.min(100.0, activeScore * 0.85 + healthScore * 0.15);
+
+        metricsRepository.updateScores(owner, name, Timestamp.valueOf(targetBucket), activeScore, healthScore, brightnessScore, sizeScore);
+        log.debug("score {}/{} @{}: active={} health={}", owner, name, targetBucket, activeScore, healthScore);
     }
 
     // ─── 스코어 계산 ────────────────────────────────────

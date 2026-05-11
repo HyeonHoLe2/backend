@@ -4,6 +4,7 @@ public record RepoMeta(
 
         String defaultBranch,
         String description,
-        int stargazersCount
+        int stargazersCount,
+        String language
 
 ) {}
