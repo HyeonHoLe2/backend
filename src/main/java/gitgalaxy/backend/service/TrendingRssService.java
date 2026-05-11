@@ -36,6 +36,8 @@ public class TrendingRssService {
 
     private final RepoRepository repoRepository;
     private final ChunkingService chunkingService;
+    private final GithubClient githubClient;
+    private final RepoSaveService repoSaveService;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     /**
@@ -67,15 +69,8 @@ public class TrendingRssService {
             String owner = parts[0], name = parts[1];
 
             try {
-                Repo repo = repoRepository.findByFullName(fullName)
-                        .orElse(Repo.builder()
-                                .fullName(fullName)
-                                .owner(owner)
-                                .name(name)
-                                .createdAt(LocalDateTime.now())
-                                .build());
-                repo.setTracked(true);
-                repoRepository.save(repo);
+                gitgalaxy.backend.model.RepoMeta meta = githubClient.getRepoMeta(owner, name);
+                repoSaveService.saveOrUpdate(owner, name, meta);
                 upserted++;
 
                 // README fetch → chunk

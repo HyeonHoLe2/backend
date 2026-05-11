@@ -22,6 +22,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_HOST: postgres
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
+    volumes:
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
     ports:
       - "8080:8080"
 
