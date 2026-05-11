@@ -3,16 +3,21 @@ package gitgalaxy.backend.service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GithubCollectorProperties;
+import gitgalaxy.backend.model.RepoMeta;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * GitHub API / raw content 호출 담당.
@@ -43,15 +48,32 @@ public class GithubClient {
     // Public API
     // ────────────────────────────────────────────────
 
-    /** repo의 default branch 이름 반환 */
-    public String getDefaultBranch(String owner, String repo) {
+
+    /** repo 메타 정보 반환 (defaultBranch, description, stargazersCount) */
+
+
+    public RepoMeta getRepoMeta(String owner, String repo) {
         String url = API_BASE + "/repos/" + owner + "/" + repo;
         String body = executeApiGet(url);
         try {
-            return objectMapper.readTree(body).get("default_branch").asText();
+            JsonNode node = objectMapper.readTree(body);
+
+            String language = node.path("language").isNull() ? null : node.path("language").asText(null);
+            return new RepoMeta(
+                    node.path("default_branch").asText("main"),
+                    node.path("description").asText(""),
+                    node.path("stargazers_count").asInt(0),
+                    language
+            );
         } catch (Exception e) {
-            throw new RuntimeException("default_branch 파싱 실패: " + url, e);
+            throw new RuntimeException("RepoMeta 파싱 실패: " + url, e);
+
         }
+    }
+
+    /** repo의 default branch 이름 반환 */
+    public String getDefaultBranch(String owner, String repo) {
+        return getRepoMeta(owner, repo).defaultBranch();
     }
 
     /** recursive tree 조회 → blob 파일 경로 목록 반환 */
@@ -76,8 +98,10 @@ public class GithubClient {
 
     /** raw 파일 내용 다운로드 */
     public String getRawContent(String owner, String repo, String branch, String filePath) {
-        // filePath에 공백/특수문자가 있을 경우 URL encode 필요할 수 있으나 대부분의 docs는 안전
-        String url = RAW_BASE + "/" + owner + "/" + repo + "/" + branch + "/" + filePath;
+        String encodedPath = Arrays.stream(filePath.split("/", -1))
+                .map(seg -> URLEncoder.encode(seg, StandardCharsets.UTF_8).replace("+", "%20"))
+                .collect(Collectors.joining("/"));
+        String url = RAW_BASE + "/" + owner + "/" + repo + "/" + branch + "/" + encodedPath;
         return executeRawGet(url);
     }
 

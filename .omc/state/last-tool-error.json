@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"rm -f /Users/ukongee/Downloads/backend/.omc/state/hud-state.json && git fetch origin && git merge origin/main --no-edit && git push origin main\",\"description\":\"Remove omc file, merge remot...",
-  "error": "Exit code 2\nerror: Your local changes to the following files would be overwritten by merge:\n\t.omc/state/hud-state.json\n\t.omc/state/last-tool-error.json\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.",
-  "timestamp": "2026-05-11T15:22:12.490Z",
-  "retry_count": 2
+  "tool_input_preview": "{\"command\":\"python3 << 'PYEOF'\\nimport json, urllib.request, ssl, time\\n\\nctx = ssl._create_unverified_context()\\nTOKEN = \\\"ntn_wN8165879247kYHIwwEiJBucEjbKrKloS1jFXgqC0uqeLW\\\"\\nHDR = {\\\"Authorization...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<stdin>\", line 20, in <module>\n  File \"<stdin>\", line 10, in req\n  File \"/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py\", line 215, in urlopen\n    return opener.open(url, data, timeout)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py\", line 521, in open\n    response = meth(req, response)\n               ^^^^^^^^^^^^^^^^^...",
+  "timestamp": "2026-04-30T16:11:58.789Z",
+  "retry_count": 1
 }
