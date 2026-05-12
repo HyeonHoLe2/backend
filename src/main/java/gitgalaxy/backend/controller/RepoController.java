@@ -10,8 +10,10 @@ import gitgalaxy.backend.model.TimelinePointDto;
 import gitgalaxy.backend.repository.RepoHourlyMetricsRepository;
 import gitgalaxy.backend.repository.RepoRepository;
 
+import gitgalaxy.backend.entity.RepoTrendReason;
 import gitgalaxy.backend.service.RagService;
 import gitgalaxy.backend.service.RepoService;
+import gitgalaxy.backend.service.TrendReasonService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -34,6 +36,7 @@ public class RepoController {
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RagService ragService;
     private final RepoService repoService;
+    private final TrendReasonService trendReasonService;
     @GetMapping
     public List<RepoListItemDto> list() {
         Map<String, RepoHourlyMetrics> latestMap = metricsRepository.findLatestPerRepo()
@@ -121,6 +124,21 @@ public class RepoController {
                 .body(Map.of("error", e.getMessage()));
     }
 
+
+    @GetMapping("/{owner}/{repo}/trend")
+    public Map<String, Object> trend(
+            @PathVariable String owner,
+            @PathVariable String repo) {
+        RepoTrendReason result = trendReasonService.getTrendReason(owner, repo);
+        return Map.of(
+                "owner", owner,
+                "repo", repo,
+                "trend", result.getTrend(),
+                "changeRate", result.getChangeRate(),
+                "reason", result.getReason(),
+                "generatedAt", result.getGeneratedAt().toString()
+        );
+    }
 
     @GetMapping("/search")
     public ResponseEntity<List<RepoResponse>> search(@RequestParam String q) {
