@@ -56,16 +56,16 @@ public class RepoHourlyMetrics {
     private int releaseCount;
 
     @Column(name = "active_score")
-    private double activeScore;
+    private Double activeScore;
 
     @Column(name = "health_score")
-    private double healthScore;
+    private Double healthScore;
 
     @Column(name = "brightness_score")
-    private double brightnessScore;
+    private Double brightnessScore;
 
     @Column(name = "size_score")
-    private double sizeScore;
+    private Double sizeScore;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

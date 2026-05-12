@@ -26,10 +26,10 @@ public record RepoListItemDto(
                 repo.getName(),
                 repo.getDescription(),
                 repo.getLanguage(),
-                latest != null ? latest.getBrightnessScore() : 0.0,
-                latest != null ? latest.getActiveScore() : 0.0,
-                latest != null ? latest.getHealthScore() : 0.0,
-                latest != null ? latest.getSizeScore() : 0.0,
+                latest != null && latest.getBrightnessScore() != null ? latest.getBrightnessScore() : 0.0,
+                latest != null && latest.getActiveScore() != null ? latest.getActiveScore() : 0.0,
+                latest != null && latest.getHealthScore() != null ? latest.getHealthScore() : 0.0,
+                latest != null && latest.getSizeScore() != null ? latest.getSizeScore() : 0.0,
                 latest != null ? latest.getBucket() : null
         );
     }

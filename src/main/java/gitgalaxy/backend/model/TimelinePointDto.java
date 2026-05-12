@@ -30,10 +30,10 @@ public record TimelinePointDto(
                 m.getIssueClosed(),
                 m.getStarCount(),
                 m.getReleaseCount(),
-                m.getActiveScore(),
-                m.getHealthScore(),
-                m.getBrightnessScore(),
-                m.getSizeScore()
+                m.getActiveScore() != null ? m.getActiveScore() : 0.0,
+                m.getHealthScore() != null ? m.getHealthScore() : 0.0,
+                m.getBrightnessScore() != null ? m.getBrightnessScore() : 0.0,
+                m.getSizeScore() != null ? m.getSizeScore() : 0.0
         );
     }
 }
