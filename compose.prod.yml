@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: gitgalaxy-postgres-dev
     env_file:
       - .env
@@ -27,6 +27,8 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
     ports:
       - "8080:8080"
   nginx:

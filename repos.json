@@ -1,6 +1,0 @@
-[
-  {"owner": "spring-projects", "repo": "spring-framework"},
-  {"owner": "spring-projects", "repo": "spring-boot"},
-  {"owner": "langchain-ai",    "repo": "langchain"},
-  {"owner": "openai",          "repo": "openai-cookbook"}
-]

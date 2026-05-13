@@ -12,7 +12,6 @@ public class GithubCollectorProperties {
     private String token = "";
 
     /** repo 목록 파일 경로 (.json 또는 .csv) */
-    private String repoListPath = "repos.json";
 
     /** JSONL 출력 디렉토리 */
     private String outputDir = "output";
