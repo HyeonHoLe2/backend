@@ -1,7 +1,7 @@
 services:
   postgres:
     image: pgvector/pgvector:pg15
-    container_name: gitgalaxy-postgres-dev
+    container_name: gitgalaxy-postgres-prod
     env_file:
       - .env
     environment:
@@ -11,11 +11,11 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-dev-data:/var/lib/postgresql/data
+      - postgres-prod-data:/var/lib/postgresql/data
 
   backend:
     build: .
-    container_name: gitgalaxy-backend-dev
+    container_name: gitgalaxy-backend-prod
     depends_on:
       - postgres
     env_file:
@@ -52,4 +52,4 @@ services:
 
 
 volumes:
-  postgres-dev-data:
+  postgres-prod-data:
