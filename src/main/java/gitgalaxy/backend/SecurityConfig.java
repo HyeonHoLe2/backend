@@ -1,6 +1,7 @@
 package gitgalaxy.backend;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,6 +18,9 @@ import java.util.List;
 public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     public SecurityConfig(CustomOAuth2UserService customOAuth2UserService) {
         this.customOAuth2UserService = customOAuth2UserService;
@@ -53,6 +57,8 @@ public class SecurityConfig {
                         .userInfoEndpoint(user -> user
                                 .userService(customOAuth2UserService)
                         )
+                        .defaultSuccessUrl(frontendUrl, true)
+                        .failureUrl(frontendUrl + "?error=oauth_failed")
                 )
                 .logout(logout -> logout
                         .logoutUrl("/auth/logout")
