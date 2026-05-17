@@ -13,11 +13,18 @@ services:
     volumes:
       - postgres-prod-data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: gitgalaxy-redis-dev
+    ports:
+      - "6379:6379"
+
   backend:
     build: .
     container_name: gitgalaxy-backend-prod
     depends_on:
       - postgres
+      - redis
     env_file:
       - .env
     environment:
@@ -27,6 +34,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
     volumes:
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
     ports:

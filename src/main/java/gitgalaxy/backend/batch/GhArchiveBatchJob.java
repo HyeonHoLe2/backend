@@ -23,8 +23,8 @@ public class GhArchiveBatchJob {
     private final RepoRepository repoRepository;
     private final EmbeddingPipelineService embeddingPipelineService;
 
-    // 매 시각 10분 후 (GH Archive 업로드 대기)
-    @Scheduled(cron = "${gharchive.cron-expression:0 10 * * * *}")
+    // 매 시각 정각 (GH Archive 업로드 대기)
+    @Scheduled(cron = "${gharchive.cron-expression:0 0 * * * *}")
     public void run() {
         LocalDateTime prevHour = LocalDateTime.now()
                 .minusHours(1).withMinute(0).withSecond(0).withNano(0);

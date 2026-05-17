@@ -16,6 +16,7 @@ import java.util.List;
 public class ScoreService {
 
     private final RepoHourlyMetricsRepository metricsRepository;
+    private final TrendReasonService trendReasonService;
 
     /**
      * 단일 repo 스코어 계산 → repo_time 테이블 해당 bucket 행에 UPDATE.
@@ -36,6 +37,12 @@ public class ScoreService {
             return;
         }
 
+        // 이전 brightnessScore 조회
+        Double prevBrightnessScore = metricsRepository
+                .findTopByRepoOwnerAndRepoNameOrderByBucketDesc(owner, name)
+                .map(RepoHourlyMetrics::getBrightnessScore)
+                .orElse(null);
+
         double activeScore     = calcActivityScore(owner, name, targetBucket.minusHours(24), targetBucket);
         double healthScore     = calcHealthScore(owner, name, targetBucket.minusDays(7), targetBucket);
         double sizeScore       = calcHealthScore(owner, name, targetBucket.minusDays(30), targetBucket);
@@ -43,6 +50,15 @@ public class ScoreService {
 
         metricsRepository.updateScores(owner, name, Timestamp.valueOf(targetBucket), activeScore, healthScore, brightnessScore, sizeScore);
         log.debug("score {}/{} @{}: active={} health={}", owner, name, targetBucket, activeScore, healthScore);
+
+        // ±20% 이상 변화 시 Redis 캐시 무효화 → 다음 요청 시 LLM 재생성
+        if (prevBrightnessScore != null && prevBrightnessScore > 0.1) {
+            double changeRate = Math.abs(brightnessScore - prevBrightnessScore) / prevBrightnessScore * 100.0;
+            if (changeRate >= 20.0) {
+                log.info("score 변화 {}% → trend reason 캐시 무효화: {}/{}", String.format("%.1f", changeRate), owner, name);
+                trendReasonService.invalidateCache(owner, name);
+            }
+        }
     }
 
     // ─── 스코어 계산 ────────────────────────────────────
