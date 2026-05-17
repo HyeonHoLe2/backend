@@ -1,5 +1,6 @@
 package gitgalaxy.backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.cloud.vertexai.VertexAI;
 import com.google.cloud.vertexai.api.GenerateContentResponse;
 import com.google.cloud.vertexai.generativeai.GenerativeModel;
@@ -10,13 +11,13 @@ import gitgalaxy.backend.repository.RepoHourlyMetricsRepository;
 import gitgalaxy.backend.repository.RepoTrendReasonRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,22 +27,70 @@ import java.util.stream.Collectors;
 @Slf4j
 public class TrendReasonService {
 
-    private static final int CACHE_TTL_HOURS = 6;
+    private static final String CACHE_KEY_PREFIX = "trend:reason:";
 
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RepoTrendReasonRepository trendReasonRepository;
     private final VertexAiProperties vertexAiProperties;
     private final JdbcTemplate jdbc;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public RepoTrendReason getTrendReason(String owner, String repo) {
-        // 캐시 확인 (6h TTL)
-        RepoTrendReason cached = trendReasonRepository.findByOwnerAndRepo(owner, repo).orElse(null);
-        if (cached != null && cached.getGeneratedAt().isAfter(Instant.now().minus(CACHE_TTL_HOURS, ChronoUnit.HOURS))) {
-            return cached;
+        String cacheKey = CACHE_KEY_PREFIX + owner + "/" + repo;
+
+        // Redis 캐시 확인
+        try {
+            String cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return objectMapper.readValue(cached, RepoTrendReason.class);
+            }
+        } catch (Exception e) {
+            log.debug("Redis 캐시 조회 실패: {}", e.getMessage());
         }
 
-        // 속도 계산
+        // DB 확인
+        RepoTrendReason dbCached = trendReasonRepository.findByOwnerAndRepo(owner, repo).orElse(null);
+
+        RepoTrendReason result = generateTrendReason(owner, repo, dbCached);
+
+        // Redis에 저장
+        try {
+            redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result));
+        } catch (Exception e) {
+            log.debug("Redis 캐시 저장 실패: {}", e.getMessage());
+        }
+
+        return result;
+    }
+
+    public void invalidateCache(String owner, String repo) {
+        String cacheKey = CACHE_KEY_PREFIX + owner + "/" + repo;
+        try {
+            redisTemplate.delete(cacheKey);
+            log.debug("Redis 캐시 삭제: {}", cacheKey);
+        } catch (Exception e) {
+            log.debug("Redis 캐시 삭제 실패: {}", e.getMessage());
+        }
+    }
+
+    @Transactional
+    public RepoTrendReason regenerate(String owner, String repo) {
+        invalidateCache(owner, repo);
+        RepoTrendReason dbCached = trendReasonRepository.findByOwnerAndRepo(owner, repo).orElse(null);
+        RepoTrendReason result = generateTrendReason(owner, repo, dbCached);
+        try {
+            redisTemplate.opsForValue().set(
+                    CACHE_KEY_PREFIX + owner + "/" + repo,
+                    objectMapper.writeValueAsString(result));
+        } catch (Exception e) {
+            log.debug("Redis 캐시 저장 실패: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    private RepoTrendReason generateTrendReason(String owner, String repo, RepoTrendReason existing) {
         LocalDateTime now = LocalDateTime.now();
         List<RepoHourlyMetrics> last24h = metricsRepository
                 .findByRepoOwnerAndRepoNameAndBucketBetweenOrderByBucketAsc(owner, repo, now.minusHours(24), now);
@@ -57,19 +106,16 @@ public class TrendReasonService {
         else if (changeRate <= -20.0) trend = "하락";
         else                          trend = "보합";
 
-        // README/코드 청크 컨텍스트 (최대 3개)
         String context = fetchRepoContext(owner, repo);
 
-        // 최근 24h 메트릭 요약
-        int totalWatch   = last24h.stream().mapToInt(RepoHourlyMetrics::getWatch).sum();
-        int totalCommit  = last24h.stream().mapToInt(RepoHourlyMetrics::getCommitCount).sum();
-        int totalPr      = last24h.stream().mapToInt(r -> r.getPrCreated() + r.getPrMerged()).sum();
-        int totalIssue   = last24h.stream().mapToInt(r -> r.getIssueOpened() + r.getIssueClosed()).sum();
+        int totalWatch  = last24h.stream().mapToInt(RepoHourlyMetrics::getWatch).sum();
+        int totalCommit = last24h.stream().mapToInt(RepoHourlyMetrics::getCommitCount).sum();
+        int totalPr     = last24h.stream().mapToInt(r -> r.getPrCreated() + r.getPrMerged()).sum();
+        int totalIssue  = last24h.stream().mapToInt(r -> r.getIssueOpened() + r.getIssueClosed()).sum();
 
         String reason = generateReason(owner, repo, trend, changeRate, totalWatch, totalCommit, totalPr, totalIssue, context);
 
-        // 저장/업데이트
-        RepoTrendReason result = cached != null ? cached : new RepoTrendReason();
+        RepoTrendReason result = existing != null ? existing : new RepoTrendReason();
         result.setOwner(owner);
         result.setRepo(repo);
         result.setTrend(trend);
