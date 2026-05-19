@@ -27,6 +27,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
     volumes:
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
     ports:
