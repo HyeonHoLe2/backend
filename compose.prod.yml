@@ -19,12 +19,32 @@ services:
     ports:
       - "6379:6379"
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    container_name: gitgalaxy-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'yellow\\|green'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
   backend:
     build: .
     container_name: gitgalaxy-backend-prod
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -35,6 +55,7 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: ${REDIS_HOST}
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:elasticsearch}
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
     volumes:
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
