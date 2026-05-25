@@ -13,6 +13,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -76,6 +77,52 @@ public class EmbeddingService {
             }
         }
         throw new RuntimeException("Embedding 실패: " + lastException.getMessage(), lastException);
+    }
+
+    public List<float[]> embedBatch(List<String> texts) {
+        List<Value> instances = texts.stream()
+                .map(text -> {
+                    String input = text.length() > 8000 ? text.substring(0, 8000) : text;
+                    return Value.newBuilder()
+                            .setStructValue(Struct.newBuilder()
+                                    .putFields("content", Value.newBuilder().setStringValue(input).build())
+                                    .build())
+                            .build();
+                })
+                .toList();
+
+        Exception lastException = null;
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                PredictResponse response = client.predict(endpointName, instances, Value.newBuilder().build());
+                List<float[]> result = new ArrayList<>();
+                for (int i = 0; i < response.getPredictionsCount(); i++) {
+                    ListValue values = response.getPredictions(i)
+                            .getStructValue()
+                            .getFieldsOrThrow("embeddings")
+                            .getStructValue()
+                            .getFieldsOrThrow("values")
+                            .getListValue();
+                    float[] vector = new float[values.getValuesCount()];
+                    for (int j = 0; j < values.getValuesCount(); j++) {
+                        vector[j] = (float) values.getValues(j).getNumberValue();
+                    }
+                    result.add(vector);
+                }
+                return result;
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("배치 임베딩 시도 {}/{} 실패: {}", attempt + 1, MAX_RETRIES, e.getMessage());
+                if (attempt < MAX_RETRIES - 1) {
+                    try { Thread.sleep(RETRY_DELAY_MS * (attempt + 1)); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Embedding 인터럽트", ie);
+                    }
+                    reconnect();
+                }
+            }
+        }
+        throw new RuntimeException("배치 Embedding 실패: " + lastException.getMessage(), lastException);
     }
 
     private float[] doEmbed(String input) {
