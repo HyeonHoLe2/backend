@@ -8,14 +8,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * 청크 목록 → OpenAI 임베딩 → pgvector 저장 파이프라인.
- * OPENAI_API_KEY 미설정 시 경고 후 스킵.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmbeddingPipelineService {
+
+    private static final int BATCH_SIZE = 20;
 
     private final EmbeddingService embeddingService;
     private final ChunkEmbeddingRepository chunkEmbeddingRepository;
@@ -26,32 +24,33 @@ public class EmbeddingPipelineService {
             return;
         }
 
+        List<ChunkDocument> toEmbed = chunks.stream()
+                .filter(chunk -> !chunkEmbeddingRepository.existsByChunkId(chunk.getChunkId()))
+                .toList();
+
+        int skipped = chunks.size() - toEmbed.size();
         int stored = 0;
-        int skipped = 0;
 
-        for (ChunkDocument chunk : chunks) {
+        int totalBatches = (int) Math.ceil((double) toEmbed.size() / BATCH_SIZE);
+        log.info("배치 임베딩 시작: 총 {}개 청크 → {}번 API 호출 예정", toEmbed.size(), totalBatches);
+
+        for (int i = 0; i < toEmbed.size(); i += BATCH_SIZE) {
+            List<ChunkDocument> batch = toEmbed.subList(i, Math.min(i + BATCH_SIZE, toEmbed.size()));
+            int batchNum = (i / BATCH_SIZE) + 1;
             try {
-                if (chunkEmbeddingRepository.existsByChunkId(chunk.getChunkId())) {
-                    skipped++;
-                    continue;
+                List<String> texts = batch.stream().map(ChunkDocument::getContent).toList();
+                List<float[]> vectors = embeddingService.embedBatch(texts);
+
+                for (int j = 0; j < batch.size(); j++) {
+                    chunkEmbeddingRepository.upsert(batch.get(j), EmbeddingService.toVectorString(vectors.get(j)));
+                    stored++;
                 }
-
-                float[] vector = embeddingService.embed(chunk.getContent());
-                chunkEmbeddingRepository.upsert(chunk, EmbeddingService.toVectorString(vector));
-                stored++;
-
-                // OpenAI RPM 한도 방지 (3000 req/min → 20ms 간격)
-                Thread.sleep(20);
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("임베딩 인터럽트: {}", chunk.getChunkId());
-                break;
+                log.info("배치 {}/{} 완료 ({}개)", batchNum, totalBatches, batch.size());
             } catch (Exception e) {
-                log.warn("임베딩 실패 (청크 스킵): {} → {}", chunk.getChunkId(), e.getMessage());
+                log.warn("배치 {}/{} 실패 (스킵): {}", batchNum, totalBatches, e.getMessage());
             }
         }
 
-        log.info("임베딩 완료: 저장={} / 스킵(기존)={} / 전체={}", stored, skipped, chunks.size());
+        log.info("임베딩 완료: 저장={} / 스킵(기존)={} / 전체={} / API 호출={}", stored, skipped, chunks.size(), totalBatches);
     }
 }
