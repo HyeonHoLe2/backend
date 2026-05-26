@@ -38,6 +38,7 @@ public class TrendingRssService {
     private final ChunkingService chunkingService;
     private final GithubClient githubClient;
     private final RepoSaveService repoSaveService;
+    private final AiSummerize aiSummerize;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     /**
@@ -72,6 +73,13 @@ public class TrendingRssService {
                 gitgalaxy.backend.model.RepoMeta meta = githubClient.getRepoMeta(owner, name);
                 repoSaveService.saveOrUpdate(owner, name, meta);
                 upserted++;
+
+                // 신규 레포만 LLM 요약 (기존 레포는 DB에서 재사용)
+                try {
+                    aiSummerize.summarize(owner, name);
+                } catch (Exception e) {
+                    log.warn("[{}/{}] 요약 실패 (스킵): {}", owner, name, e.getMessage());
+                }
 
                 // README fetch → chunk
                 List<ChunkDocument> chunks = fetchReadmeChunks(owner, name);

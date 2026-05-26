@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -24,6 +26,12 @@ public class AiSummerize {
     private final GithubClient githubClient;
 
     public String summarize(String owner, String repo) {
+        Optional<RepoAiSummary> existing = repoAiSummaryRepository.findByOwnerAndRepo(owner, repo);
+        if (existing.isPresent() && existing.get().getSummary() != null) {
+            log.debug("[{}/{}] 기존 요약 재사용", owner, repo);
+            return existing.get().getSummary();
+        }
+
         String readme = fetchReadme(owner, repo);
         if (readme == null || readme.isBlank()) {
             log.warn("[{}/{}] README 없음 — 요약 생략", owner, repo);
