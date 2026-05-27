@@ -44,4 +44,4 @@ out/
 .env.prod.omc/
 .omc/
 .claude/
-gcp-credentials.json
+gcp-key.json
