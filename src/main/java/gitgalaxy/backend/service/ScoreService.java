@@ -55,8 +55,8 @@ public class ScoreService {
         if (prevBrightnessScore != null && prevBrightnessScore > 0.1) {
             double changeRate = Math.abs(brightnessScore - prevBrightnessScore) / prevBrightnessScore * 100.0;
             if (changeRate >= 20.0) {
-                log.info("score 변화 {}% → trend reason 캐시 무효화: {}/{}", String.format("%.1f", changeRate), owner, name);
-                trendReasonService.invalidateCache(owner, name);
+                log.info("score 변화 {}% → trend reason 재생성: {}/{}", String.format("%.1f", changeRate), owner, name);
+                trendReasonService.regenerate(owner, name);
             }
         }
     }
