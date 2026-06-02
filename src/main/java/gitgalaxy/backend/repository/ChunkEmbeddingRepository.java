@@ -75,4 +75,17 @@ public class ChunkEmbeddingRepository {
                 """,
                 queryVector, queryVector, limit);
     }
+
+    /** Hybrid 검색용: Dense Top-N + embedded_at 반환 (재랭킹은 서비스 레이어에서 수행) */
+    public List<Map<String, Object>> findSimilarGlobalWithTime(String queryVector, int limit) {
+        return jdbc.queryForList("""
+                SELECT chunk_id, repo_owner, repo_name, file_path, heading, content, url,
+                       1 - (embedding <=> ?::vector) AS similarity,
+                       embedded_at
+                FROM chunk_embeddings
+                ORDER BY embedding <=> ?::vector
+                LIMIT ?
+                """,
+                queryVector, queryVector, limit);
+    }
 }
