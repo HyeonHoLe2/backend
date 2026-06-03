@@ -17,3 +17,7 @@ CREATE TABLE IF NOT EXISTS chunk_embeddings (
 
 CREATE INDEX IF NOT EXISTS idx_chunk_embeddings_repo
     ON chunk_embeddings (repo_owner, repo_name);
+
+CREATE INDEX IF NOT EXISTS idx_chunk_embeddings_hnsw
+    ON chunk_embeddings USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
