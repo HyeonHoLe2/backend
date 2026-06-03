@@ -101,7 +101,8 @@ public class RagService {
             if (t < minTime) minTime = t;
             if (t > maxTime) maxTime = t;
         }
-        long timeRange = maxTime - minTime;
+        final long timeRange = maxTime - minTime;
+        final long finalMinTime = minTime;
 
         double wTime = switch (intent) {
             case LATEST -> W_TIME_LATEST;
@@ -126,7 +127,7 @@ public class RagService {
                 .map(chunk -> {
                     double denseScore = toDouble(chunk.get("similarity"));
                     double normalizedTime = timeRange == 0 ? 0.5 :
-                            (double)(toEpoch(chunk.get("embedded_at")) - minTime) / timeRange;
+                            (double)(toEpoch(chunk.get("embedded_at")) - finalMinTime) / timeRange;
                     // STABLE intent는 오래된 것이 높은 점수
                     double timeScore = intent == QueryIntent.STABLE ? 1.0 - normalizedTime : normalizedTime;
                     double hybridScore = wDense * denseScore + wTime * timeScore;
