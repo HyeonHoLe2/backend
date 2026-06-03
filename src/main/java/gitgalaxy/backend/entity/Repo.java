@@ -33,11 +33,14 @@ public class Repo {
     @Column(name = "star_count")
     private int starCount;
 
+    // 기존 행은 fork_count/open_issues_count가 NULL일 수 있어 primitive int 사용 시
+    // 엔티티 hydration에서 "Null value assigned to primitive" 예외 발생 → Integer(nullable)로 보관.
+    // 스케줄러 수집 후 실제 값이 채워지며, 그 전에는 DTO 매핑에서 0으로 노출한다.
     @Column(name = "fork_count")
-    private int forkCount;
+    private Integer forkCount;
 
     @Column(name = "open_issues_count")
-    private int openIssuesCount;
+    private Integer openIssuesCount;
 
     @Column(name = "default_branch")
     private String defaultBranch;
