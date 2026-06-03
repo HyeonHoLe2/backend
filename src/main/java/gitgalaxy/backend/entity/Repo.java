@@ -33,6 +33,12 @@ public class Repo {
     @Column(name = "star_count")
     private int starCount;
 
+    @Column(name = "fork_count")
+    private int forkCount;
+
+    @Column(name = "open_issues_count")
+    private int openIssuesCount;
+
     @Column(name = "default_branch")
     private String defaultBranch;
 

@@ -56,9 +56,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: ${REDIS_HOST}
       ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-elasticsearch}
-      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
     volumes:
-      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+      - ./gcp-key.json:/app/gcp-key.json:ro
     ports:
       - "8080:8080"
   nginx:
