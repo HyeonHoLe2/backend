@@ -63,6 +63,8 @@ public class GithubClient {
                     node.path("default_branch").asText("main"),
                     node.path("description").asText(""),
                     node.path("stargazers_count").asInt(0),
+                    node.path("forks_count").asInt(0),
+                    node.path("open_issues_count").asInt(0),
                     language
             );
         } catch (Exception e) {

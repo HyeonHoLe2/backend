@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Data
 public class VertexAiProperties {
 
-    private String project = "gitgalaxy-495508";
+    private String project = "galaxy-498305";
     private String location = "us-central1";
     private String model = "gemini-2.5-flash";
     private String embeddingModel = "text-embedding-004";

@@ -24,6 +24,8 @@ public class RepoSaveService {
         repo.setName(repoName);
         repo.setDescription(meta.description());
         repo.setStarCount(meta.stargazersCount());
+        repo.setForkCount(meta.forksCount());
+        repo.setOpenIssuesCount(meta.openIssuesCount());
         repo.setDefaultBranch(meta.defaultBranch());
         repo.setLanguage(meta.language());
         repo.setTracked(true);
