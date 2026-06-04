@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import gitgalaxy.backend.config.GhArchiveProperties;
 import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.model.ChunkDocument;
+import gitgalaxy.backend.model.GhArchiveResult;
 import gitgalaxy.backend.repository.RepoHourlyMetricsRepository;
 import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,7 @@ public class GhArchiveService {
      * - commit message / PR body / issue body → ChunkDocument 반환 (임베딩용)
      * - WatchEvent ≥ threshold인 미추적 repo → repos 등록
      */
-    public List<ChunkDocument> processHour(LocalDateTime bucket) {
+    public GhArchiveResult processHour(LocalDateTime bucket) {
         String fileName = bucket.format(HOUR_FMT) + ".json.gz";
         String url = props.getBaseUrl() + "/" + fileName;
         log.info("GH Archive 처리 시작: {}", url);
@@ -83,7 +84,7 @@ public class GhArchiveService {
             HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
             if (resp.statusCode() != 200) {
                 log.warn("GH Archive 파일 없음 (HTTP {}): {}", resp.statusCode(), url);
-                return List.of();
+                return new GhArchiveResult(List.of(), Set.of());
             }
 
             try (BufferedReader reader = new BufferedReader(
@@ -96,10 +97,10 @@ public class GhArchiveService {
             }
         } catch (Exception e) {
             log.error("GH Archive 처리 실패 {}: {}", url, e.getMessage(), e);
-            return List.of();
+            return new GhArchiveResult(List.of(), Set.of());
         }
 
-        log.info("GH Archive {}: {}줄, metrics {}개 repo, chunks {}개", fileName, lineCount, metrics.size(), chunks.size());
+        log.info("GH Archive {}: {}줄, 이벤트 발생 레포 {}개, chunks {}개", fileName, lineCount, metrics.size(), chunks.size());
 
         // 추적 repo 메트릭 upsert
         for (Map.Entry<String, int[]> entry : metrics.entrySet()) {
@@ -134,7 +135,7 @@ public class GhArchiveService {
         }
         if (discovered > 0) log.info("GH Archive: 신규 repo 후보 {}개 (watch≥{})", discovered, props.getMinWatchCountForDiscovery());
 
-        return chunks;
+        return new GhArchiveResult(chunks, metrics.keySet());
     }
 
     // ─── private ──────────────────────────────────────────

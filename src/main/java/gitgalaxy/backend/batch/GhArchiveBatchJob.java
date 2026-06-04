@@ -1,7 +1,6 @@
 package gitgalaxy.backend.batch;
 
-import gitgalaxy.backend.model.ChunkDocument;
-import gitgalaxy.backend.repository.RepoRepository;
+import gitgalaxy.backend.model.GhArchiveResult;
 import gitgalaxy.backend.service.EmbeddingPipelineService;
 import gitgalaxy.backend.service.GhArchiveService;
 import gitgalaxy.backend.service.ScoreService;
@@ -11,7 +10,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -20,44 +18,44 @@ public class GhArchiveBatchJob {
 
     private final GhArchiveService ghArchiveService;
     private final ScoreService scoreService;
-    private final RepoRepository repoRepository;
     private final EmbeddingPipelineService embeddingPipelineService;
 
-    // 매 시각 정각 (GH Archive 업로드 대기)
     @Scheduled(cron = "${gharchive.cron-expression:0 0 * * * *}")
     public void run() {
         LocalDateTime prevHour = LocalDateTime.now()
                 .minusHours(1).withMinute(0).withSecond(0).withNano(0);
         log.info("GhArchiveBatchJob 시작: hour={}", prevHour);
 
-        // GH Archive 처리: repo_time 메트릭 upsert + 텍스트 청크 추출
-        List<ChunkDocument> chunks;
+        GhArchiveResult result;
         try {
-            chunks = ghArchiveService.processHour(prevHour);
+            result = ghArchiveService.processHour(prevHour);
         } catch (Exception e) {
             log.error("GhArchiveBatchJob processHour 실패", e);
             return;
         }
 
-        // commit/PR/issue 텍스트 임베딩
-        if (!chunks.isEmpty()) {
-            log.info("GhArchiveBatchJob: {}개 청크 임베딩", chunks.size());
+        if (!result.chunks().isEmpty()) {
+            log.info("GhArchiveBatchJob: {}개 청크 임베딩", result.chunks().size());
             try {
-                embeddingPipelineService.embedAndStore(chunks);
+                embeddingPipelineService.embedAndStore(result.chunks());
             } catch (Exception e) {
                 log.error("임베딩 실패", e);
             }
         }
 
-        // repo_time 해당 bucket 행에 스코어 UPDATE
-        repoRepository.findByTrackedTrue().forEach(repo -> {
+        // 이벤트가 발생한 레포만 스코어 계산
+        int scored = 0;
+        for (String fullName : result.affectedRepos()) {
+            String[] parts = fullName.split("/", 2);
+            if (parts.length != 2) continue;
             try {
-                scoreService.calculateAndSave(repo.getOwner(), repo.getName(), prevHour);
+                scoreService.calculateAndSave(parts[0], parts[1], prevHour);
+                scored++;
             } catch (Exception e) {
-                log.warn("스코어 계산 실패 {}/{}: {}", repo.getOwner(), repo.getName(), e.getMessage());
+                log.warn("스코어 계산 실패 {}: {}", fullName, e.getMessage());
             }
-        });
+        }
 
-        log.info("GhArchiveBatchJob 완료");
+        log.info("GhArchiveBatchJob 완료: 스코어 계산 레포={}개 (전체 추적 레포 중 이벤트 발생한 것만)", scored);
     }
 }
