@@ -169,7 +169,7 @@ public class GhArchiveService {
                     String action = payload.path("action").asText();
                     if ("opened".equals(action)) {
                         m[W_PR_OPEN]++;
-                    } else if ("closed".equals(action)) {
+                    } else if ("merged".equals(action)) {
                         boolean merged = payload.path("pull_request").path("merged").asBoolean();
                         if (merged) m[W_PR_MERGE]++;
                     }
