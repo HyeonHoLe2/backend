@@ -7,6 +7,7 @@ import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.model.ChunkDocument;
 import gitgalaxy.backend.model.GhArchiveResult;
 import gitgalaxy.backend.repository.RepoHourlyMetricsRepository;
+import gitgalaxy.backend.repository.RepoMetricsBatchRepository;
 import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,7 @@ public class GhArchiveService {
     private final GhArchiveProperties props;
     private final RepoRepository repoRepository;
     private final RepoHourlyMetricsRepository metricsRepository;
+    private final RepoMetricsBatchRepository batchRepository;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -102,17 +104,11 @@ public class GhArchiveService {
 
         log.info("GH Archive {}: {}줄, 이벤트 발생 레포 {}개, chunks {}개", fileName, lineCount, metrics.size(), chunks.size());
 
-        // 추적 repo 메트릭 upsert
-        for (Map.Entry<String, int[]> entry : metrics.entrySet()) {
-            String[] parts = entry.getKey().split("/", 2);
-            int[] m = entry.getValue();
-            try {
-                metricsRepository.upsert(parts[0], parts[1], Timestamp.valueOf(bucket),
-                        m[W_WATCH], m[W_COMMIT], m[W_PR_OPEN], m[W_PR_MERGE],
-                        m[W_IS_OPEN], m[W_IS_CLOSE], m[W_STAR], m[W_RELEASE]);
-            } catch (Exception e) {
-                log.warn("repo_time upsert 실패 {}: {}", entry.getKey(), e.getMessage());
-            }
+        // 추적 repo 메트릭 배치 upsert
+        try {
+            batchRepository.batchUpsert(metrics, Timestamp.valueOf(bucket));
+        } catch (Exception e) {
+            log.warn("repo_time 배치 upsert 실패: {}", e.getMessage());
         }
 
         // WatchEvent ≥ threshold인 미추적 repo 등록

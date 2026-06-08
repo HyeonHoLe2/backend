@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -43,19 +44,15 @@ public class GhArchiveBatchJob {
             }
         }
 
-        // 이벤트가 발생한 레포만 스코어 계산
-        int scored = 0;
-        for (String fullName : result.affectedRepos()) {
-            String[] parts = fullName.split("/", 2);
-            if (parts.length != 2) continue;
-            try {
-                scoreService.calculateAndSave(parts[0], parts[1], prevHour);
-                scored++;
-            } catch (Exception e) {
-                log.warn("스코어 계산 실패 {}: {}", fullName, e.getMessage());
-            }
+        // 이벤트가 발생한 레포만 배치 스코어 계산
+        List<String> affectedList = result.affectedRepos().stream()
+                .filter(f -> f.contains("/")).toList();
+        try {
+            scoreService.calculateAndSaveBatch(affectedList, prevHour);
+        } catch (Exception e) {
+            log.warn("배치 스코어 계산 실패: {}", e.getMessage());
         }
 
-        log.info("GhArchiveBatchJob 완료: 스코어 계산 레포={}개 (전체 추적 레포 중 이벤트 발생한 것만)", scored);
+        log.info("GhArchiveBatchJob 완료: 스코어 계산 레포={}개", affectedList.size());
     }
 }

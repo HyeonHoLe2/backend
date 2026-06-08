@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,14 +28,10 @@ public class AdminAsyncService {
             GhArchiveResult result = ghArchiveService.processHour(hourBucket);
             embeddingPipelineService.embedAndStore(result.chunks());
 
-            int scored = 0;
-            for (String fullName : result.affectedRepos()) {
-                String[] parts = fullName.split("/", 2);
-                if (parts.length != 2) continue;
-                scoreService.calculateAndSave(parts[0], parts[1], hourBucket);
-                scored++;
-            }
-            log.info("GH Archive 비동기 처리 완료: chunks={}, 스코어 계산 레포={}", result.chunks().size(), scored);
+            List<String> affectedList = result.affectedRepos().stream()
+                    .filter(f -> f.contains("/")).toList();
+            scoreService.calculateAndSaveBatch(affectedList, hourBucket);
+            log.info("GH Archive 비동기 처리 완료: chunks={}, 스코어 계산 레포={}", result.chunks().size(), affectedList.size());
         } catch (Exception e) {
             log.error("GH Archive 비동기 처리 실패: {}", e.getMessage(), e);
         }
