@@ -58,7 +58,7 @@ public class EmbeddingService {
     }
 
     public float[] embed(String text) {
-        String input = text.length() > 8000 ? text.substring(0, 8000) : text;
+        String input = text.length() > 1000 ? text.substring(0, 1000) : text;
 
         Exception lastException = null;
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -82,7 +82,7 @@ public class EmbeddingService {
     public List<float[]> embedBatch(List<String> texts) {
         List<Value> instances = texts.stream()
                 .map(text -> {
-                    String input = text.length() > 8000 ? text.substring(0, 8000) : text;
+                    String input = text.length() > 1000 ? text.substring(0, 1000) : text;
                     return Value.newBuilder()
                             .setStructValue(Struct.newBuilder()
                                     .putFields("content", Value.newBuilder().setStringValue(input).build())
