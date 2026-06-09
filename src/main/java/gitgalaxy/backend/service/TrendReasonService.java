@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class TrendReasonService {
 
     private static final String CACHE_KEY_PREFIX = "trend:reason:";
+    private static final Duration CACHE_TTL = Duration.ofHours(1);
 
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RepoTrendReasonRepository trendReasonRepository;
@@ -57,7 +59,7 @@ public class TrendReasonService {
 
         // Redis에 저장
         try {
-            redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result));
+            redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result), CACHE_TTL);
         } catch (Exception e) {
             log.debug("Redis 캐시 저장 실패: {}", e.getMessage());
         }

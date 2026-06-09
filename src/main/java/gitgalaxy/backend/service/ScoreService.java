@@ -42,12 +42,6 @@ public class ScoreService {
             return;
         }
 
-        // 이전 brightnessScore 조회
-        Double prevBrightnessScore = metricsRepository
-                .findTopByRepoOwnerAndRepoNameOrderByBucketDesc(owner, name)
-                .map(RepoHourlyMetrics::getBrightnessScore)
-                .orElse(null);
-
         double activeScore     = calcActivityScore(owner, name, targetBucket.minusHours(24), targetBucket);
         double healthScore     = calcHealthScore(owner, name, targetBucket.minusDays(7), targetBucket);
         double sizeScore       = calcHealthScore(owner, name, targetBucket.minusDays(30), targetBucket);
@@ -56,14 +50,6 @@ public class ScoreService {
         metricsRepository.updateScores(owner, name, Timestamp.valueOf(targetBucket), activeScore, healthScore, brightnessScore, sizeScore);
         log.debug("score {}/{} @{}: active={} health={}", owner, name, targetBucket, activeScore, healthScore);
 
-        // ±20% 이상 변화 시 Redis 캐시 무효화 → 다음 요청 시 LLM 재생성
-        if (prevBrightnessScore != null && prevBrightnessScore > 0.1) {
-            double changeRate = Math.abs(brightnessScore - prevBrightnessScore) / prevBrightnessScore * 100.0;
-            if (changeRate >= 20.0) {
-                log.info("score 변화 {}% → trend reason 재생성: {}/{}", String.format("%.1f", changeRate), owner, name);
-                trendReasonService.regenerate(owner, name);
-            }
-        }
     }
 
     /**
@@ -73,15 +59,7 @@ public class ScoreService {
     public void calculateAndSaveBatch(List<String> fullNames, LocalDateTime bucket) {
         if (fullNames.isEmpty()) return;
 
-        // ① prevBrightnessScore 한방에 조회
-        Map<String, Double> prevBrightness = batchRepository.findLatestForRepos(fullNames)
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> r.getRepoOwner() + "/" + r.getRepoName(),
-                        r -> r.getBrightnessScore() != null ? r.getBrightnessScore() : 0.0
-                ));
-
-        // ② 30일치 데이터 한방에 조회 (24h / 7d / 30d 모두 커버)
+        // ① 30일치 데이터 한방에 조회 (24h / 7d / 30d 모두 커버)
         List<RepoHourlyMetrics> allRows = batchRepository.findAllForReposInRange(
                 fullNames, bucket.minusDays(30), bucket);
 
@@ -106,13 +84,6 @@ public class ScoreService {
             updates.add(new RepoMetricsBatchRepository.ScoreUpdate(
                     parts[0], parts[1], bucket, active, health, brightness, size));
 
-            double prev = prevBrightness.getOrDefault(fullName, 0.0);
-            if (prev > 0.1) {
-                double changeRate = Math.abs(brightness - prev) / prev * 100.0;
-                if (changeRate >= 20.0) {
-                    trendReasonService.regenerate(parts[0], parts[1]);
-                }
-            }
         }
 
         // ④ UPDATE 한방에
