@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
  *   2. chunk_embeddings에서 cosine 유사도 top-5 검색
  *   3. 검색 결과로 context 구성
  *   4. LLM에 prompt 전달 → 설명 반환
+ * 같은 질문은 Redis 캐시(RagAnswerCache)에서 바로 반환 → 임베딩·벡터 검색·LLM 호출 생략.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,11 +36,23 @@ public class RagService {
     private final EmbeddingService embeddingService;
     private final ChunkEmbeddingRepository chunkEmbeddingRepository;
     private final LlmService llmService;
+    private final RagAnswerCache ragAnswerCache;
 
     enum QueryIntent { LATEST, STABLE, NEUTRAL }
 
     /** 특정 repo에 대한 질문 답변 */
     public String explain(String owner, String repo, String question) {
+        return answerOrFallback(ragAnswerCache.getOrLoad(RagAnswerCache.repoScope(owner, repo), question,
+                () -> generate(owner, repo, question)));
+    }
+
+    /** 전체 repo 대상 Hybrid RAG 검색 */
+    public String explainGlobal(String question) {
+        return answerOrFallback(ragAnswerCache.getOrLoad(RagAnswerCache.globalScope(), question,
+                () -> generateGlobal(question)));
+    }
+
+    private String generate(String owner, String repo, String question) {
         String queryVector = toQueryVector(question);
 
         List<Map<String, Object>> chunks = chunkEmbeddingRepository.findSimilar(queryVector, owner, repo, TOP_K);
@@ -50,11 +63,10 @@ public class RagService {
         }
 
         log.debug("RAG: {}/{} 질문='{}' → {}개 청크 검색됨", owner, repo, question, chunks.size());
-        return llmService.chat(buildPrompt(owner + "/" + repo, question, buildContext(chunks)));
+        return blankToNull(llmService.chat(buildPrompt(owner + "/" + repo, question, buildContext(chunks))));
     }
 
-    /** 전체 repo 대상 Hybrid RAG 검색 */
-    public String explainGlobal(String question) {
+    private String generateGlobal(String question) {
         QueryIntent intent = detectIntent(question);
         log.debug("RAG global: 질문='{}' intent={}", question, intent);
 
@@ -72,7 +84,17 @@ public class RagService {
         List<Map<String, Object>> reranked = hybridRerank(candidates, intent, TOP_K);
 
         log.debug("RAG global: {}개 후보 → {}개 재랭킹 완료", candidates.size(), reranked.size());
-        return llmService.chat(buildPrompt("GitHub repos", question, buildContext(reranked)));
+        return blankToNull(llmService.chat(buildPrompt("GitHub repos", question, buildContext(reranked))));
+    }
+
+    /** 빈 응답은 null → 캐시에 저장하지 않음 (다음 요청에서 다시 생성) */
+    private static String blankToNull(String answer) {
+        return answer == null || answer.isBlank() ? null : answer;
+    }
+
+    /** LLM이 빈 응답(안전 필터 차단 등)을 주면 안내 문구로 대체 */
+    private static String answerOrFallback(String answer) {
+        return answer == null || answer.isBlank() ? "답변을 생성하지 못했습니다. 질문을 바꿔 다시 시도해 주세요." : answer;
     }
 
     // ────────────────────────────────────────────────

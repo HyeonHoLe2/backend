@@ -21,7 +21,6 @@ public class ScoreService {
 
     private final RepoHourlyMetricsRepository metricsRepository;
     private final RepoMetricsBatchRepository batchRepository;
-    private final TrendReasonService trendReasonService;
 
     /**
      * 단일 repo 스코어 계산 → repo_time 테이블 해당 bucket 행에 UPDATE.

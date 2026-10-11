@@ -34,6 +34,7 @@ public class RepoMetricsBatchRepository {
         m.setIssueClosed(rs.getInt("issue_closed"));
         m.setStarCount(rs.getInt("star_count"));
         m.setReleaseCount(rs.getInt("release_count"));
+        m.setForkCount(rs.getInt("fork_count"));
         m.setActiveScore(rs.getObject("active_score", Double.class));
         m.setHealthScore(rs.getObject("health_score", Double.class));
         m.setBrightnessScore(rs.getObject("brightness_score", Double.class));
@@ -86,9 +87,9 @@ public class RepoMetricsBatchRepository {
                         INSERT INTO repo_time
                             (repo_owner, repo_name, bucket,
                              watch, commit_count, pr_created, pr_merged,
-                             issue_opened, issue_closed, star_count, release_count,
+                             issue_opened, issue_closed, star_count, release_count, fork_count,
                              created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                         ON CONFLICT (repo_owner, repo_name, bucket) DO UPDATE SET
                             watch         = EXCLUDED.watch,
                             commit_count  = EXCLUDED.commit_count,
@@ -98,6 +99,7 @@ public class RepoMetricsBatchRepository {
                             issue_closed  = EXCLUDED.issue_closed,
                             star_count    = EXCLUDED.star_count,
                             release_count = EXCLUDED.release_count,
+                            fork_count    = EXCLUDED.fork_count,
                             updated_at    = NOW()
                         """,
                 entries,
@@ -116,6 +118,7 @@ public class RepoMetricsBatchRepository {
                     ps.setInt(9, m[5]);
                     ps.setInt(10, m[6]);
                     ps.setInt(11, m[7]);
+                    ps.setInt(12, m[8]);
                 });
     }
 

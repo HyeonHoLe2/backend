@@ -7,7 +7,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "1234"
     ports:
-      - "5432:5432"
+      # 다른 프로젝트가 5432를 쓰면 POSTGRES_HOST_PORT=5433 처럼 바꿔서 실행 (앱은 DB_PORT로 맞춤)
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
 
@@ -61,11 +62,12 @@ services:
     image: prom/prometheus:latest
     container_name: gitgalaxy-prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
-    depends_on:
-      - backend
+    # 로컬은 bootRun으로 앱을 띄우므로 backend 컨테이너에 의존하지 않음
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:latest
@@ -73,11 +75,15 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
     ports:
-      - "3000:3000"
+      # 3000을 다른 앱(Next.js 등)이 쓰면 GRAFANA_HOST_PORT=3001 처럼 바꿔서 실행
+      - "${GRAFANA_HOST_PORT:-3000}:3000"
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - postgres
 
 volumes:
   postgres-dev-data:

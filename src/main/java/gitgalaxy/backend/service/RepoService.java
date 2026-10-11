@@ -1,6 +1,7 @@
 package gitgalaxy.backend.service;
 
 import gitgalaxy.backend.document.RepoDocument;
+import gitgalaxy.backend.entity.Repo;
 import gitgalaxy.backend.model.RepoResponse;
 import gitgalaxy.backend.repository.RepoRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,13 +30,13 @@ public class RepoService {
     public List<RepoResponse> search(String keyword) {
         try {
             var query = NativeQuery.builder()
-                    .withQuery(q -> q
-                            .multiMatch(mm -> mm
+                    .withQuery(q -> q.bool(b -> b
+                            .must(m -> m.multiMatch(mm -> mm
                                     .query(keyword)
                                     .fields(List.of("name^4", "fullName^4", "description^2", "owner"))
-                                    .fuzziness("AUTO")
-                            )
-                    )
+                                    .fuzziness("AUTO")))
+                            // 삭제·비공개로 추적 해제된 repo 제외 (점수에 영향 없는 filter)
+                            .filter(f -> f.term(t -> t.field("tracked").value(true)))))
                     .build();
 
             SearchHits<RepoDocument> hits = elasticsearchOperations.search(query, RepoDocument.class);
@@ -41,7 +45,12 @@ public class RepoService {
                 List<Long> ids = hits.getSearchHits().stream()
                         .map(h -> Long.parseLong(h.getContent().getId()))
                         .toList();
-                return repoRepository.findAllById(ids).stream()
+                // findAllById는 순서를 보장하지 않음 → ES 관련도 순서대로 다시 정렬 (DB에서 사라진 id는 제외)
+                Map<Long, Repo> byId = repoRepository.findAllById(ids).stream()
+                        .collect(Collectors.toMap(Repo::getId, Function.identity()));
+                return ids.stream()
+                        .map(byId::get)
+                        .filter(r -> r != null && r.isTracked())
                         .map(RepoResponse::from)
                         .toList();
             }

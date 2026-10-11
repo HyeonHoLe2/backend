@@ -45,3 +45,5 @@ out/
 .omc/
 .claude/
 gcp-key.json
+# 블루-그린 배포 스크립트가 서버에서 생성·관리 (활성 색)
+nginx/conf.d/00-backend-upstream.conf

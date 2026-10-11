@@ -1,7 +1,36 @@
+x-backend: &backend
+  build: .
+  image: gitgalaxy-backend:latest
+  restart: unless-stopped
+  # 종료 신호를 받으면 진행 중인 요청·정시 작업(수집 최대 수 분)을 마치고 내려가도록 넉넉히
+  stop_grace_period: 11m
+  depends_on:
+    postgres:
+      condition: service_started
+    redis:
+      condition: service_started
+    elasticsearch:
+      condition: service_healthy
+  env_file:
+    - .env
+  environment:
+    SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+    DB_HOST: ${DB_HOST}
+    DB_PORT: ${DB_PORT}
+    DB_NAME: ${DB_NAME}
+    DB_USERNAME: ${DB_USERNAME}
+    DB_PASSWORD: ${DB_PASSWORD}
+    REDIS_HOST: ${REDIS_HOST}
+    ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-elasticsearch}
+    GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
+  volumes:
+    - ./gcp-key.json:/app/gcp-key.json:ro
+
 services:
   postgres:
     image: pgvector/pgvector:pg15
     container_name: gitgalaxy-postgres-prod
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -16,12 +45,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: gitgalaxy-redis-dev
+    restart: unless-stopped
     ports:
       - "6379:6379"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
     container_name: gitgalaxy-elasticsearch
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -35,32 +66,19 @@ services:
       retries: 12
       start_period: 40s
 
-  backend:
-    build: .
-    container_name: gitgalaxy-backend-prod
-    depends_on:
-      postgres:
-        condition: service_started
-      redis:
-        condition: service_started
-      elasticsearch:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_HOST: ${REDIS_HOST}
-      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-elasticsearch}
-      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
-    volumes:
-      - ./gcp-key.json:/app/gcp-key.json:ro
+  # 블루-그린 무중단 배포: 같은 이미지를 두 색으로 띄우고 Nginx가 한쪽으로만 트래픽을 보냄 (scripts/deploy-blue-green.sh)
+  backend-blue:
+    <<: *backend
+    container_name: gitgalaxy-backend-blue
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8081:8080"   # 헬스체크용, 외부 노출 없음 (외부 요청은 Nginx로만)
+
+  backend-green:
+    <<: *backend
+    container_name: gitgalaxy-backend-green
+    ports:
+      - "127.0.0.1:8082:8080"
+
   nginx:
           image: nginx:alpine
           container_name: gitgalaxy-nginx
@@ -71,8 +89,7 @@ services:
             - ./nginx/conf.d:/etc/nginx/conf.d
             - ./certbot/conf:/etc/letsencrypt
             - ./certbot/www:/var/www/certbot
-          depends_on:
-            - backend
+          restart: unless-stopped
 
   certbot:
             image: certbot/certbot
@@ -83,16 +100,16 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: gitgalaxy-prometheus
+    restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
-    depends_on:
-      - backend
 
   grafana:
     image: grafana/grafana:latest
     container_name: gitgalaxy-grafana
+    restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
     ports:

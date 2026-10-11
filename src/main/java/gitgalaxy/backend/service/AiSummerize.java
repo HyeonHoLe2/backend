@@ -1,9 +1,5 @@
 package gitgalaxy.backend.service;
 
-import com.google.cloud.vertexai.VertexAI;
-import com.google.cloud.vertexai.api.GenerateContentResponse;
-import com.google.cloud.vertexai.generativeai.GenerativeModel;
-import gitgalaxy.backend.config.VertexAiProperties;
 import gitgalaxy.backend.entity.RepoAiSummary;
 import gitgalaxy.backend.repository.RepoAiSummaryRepository;
 import gitgalaxy.backend.repository.RepoRepository;
@@ -20,10 +16,10 @@ public class AiSummerize {
 
     private static final long RETRY_DELAY_CAP_MS = 60_000;
 
-    private final VertexAiProperties vertexAiProperties;
     private final RepoAiSummaryRepository repoAiSummaryRepository;
     private final RepoRepository repoRepository;
     private final GithubClient githubClient;
+    private final GeminiClient geminiClient;
 
     public String summarize(String owner, String repo) {
         Optional<RepoAiSummary> existing = repoAiSummaryRepository.findByOwnerAndRepo(owner, repo);
@@ -54,14 +50,14 @@ public class AiSummerize {
         long waitMs = 2000;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try (VertexAI vertexAI = new VertexAI(vertexAiProperties.getProject(), vertexAiProperties.getLocation())) {
-                GenerativeModel model = new GenerativeModel(vertexAiProperties.getModel(), vertexAI);
-                GenerateContentResponse response = model.generateContent(prompt);
-                String text = response.getCandidates(0).getContent().getParts(0).getText();
+            try {
+                long t0 = System.nanoTime();
+                String text = geminiClient.generate(prompt);
+                long genMs = (System.nanoTime() - t0) / 1_000_000;
 
                 if (text != null && !text.isBlank()) {
                     upsertSummary(owner, repo, text.strip());
-                    log.info("[{}/{}] AI 요약 완료", owner, repo);
+                    log.info("[{}/{}] AI 요약 완료 (Gemini {}ms)", owner, repo, genMs);
                     return text.strip();
                 }
                 log.warn("[{}/{}] AI 요약 응답 비어있음", owner, repo);

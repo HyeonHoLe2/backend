@@ -1,0 +1,10 @@
+# 로컬 개발용: 앱을 컨테이너 밖(bootRun)에서 실행하므로 호스트의 8080을 수집
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'gitgalaxy-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8082']

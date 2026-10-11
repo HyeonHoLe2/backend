@@ -29,17 +29,61 @@ public class ChunkEmbeddingRepository {
         return count != null && count > 0;
     }
 
+    private static final int EXISTS_QUERY_CHUNK = 5_000;
+
+    /**
+     * 이미 저장된 chunk_id 일괄 조회 (chunk_id 유니크 인덱스 → Index Only Scan).
+     * 청크마다 existsByChunkId를 부르면 DB 왕복이 청크 수만큼 생겨, 목록을 ANY(배열)로 한 번에 확인.
+     */
+    public java.util.Set<String> findExistingChunkIds(List<String> chunkIds) {
+        java.util.Set<String> existing = new java.util.HashSet<>();
+        for (int i = 0; i < chunkIds.size(); i += EXISTS_QUERY_CHUNK) {
+            List<String> part = chunkIds.subList(i, Math.min(i + EXISTS_QUERY_CHUNK, chunkIds.size()));
+            jdbc.query(con -> {
+                var ps = con.prepareStatement("SELECT chunk_id FROM chunk_embeddings WHERE chunk_id = ANY(?)");
+                ps.setArray(1, con.createArrayOf("text", part.toArray(String[]::new)));
+                return ps;
+            }, rs -> { existing.add(rs.getString(1)); });
+        }
+        return existing;
+    }
+
+    private static final String UPSERT_SQL = """
+            INSERT INTO chunk_embeddings
+                (chunk_id, repo_owner, repo_name, file_path, heading, content, url, embedding, embedded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?::vector, ?)
+            ON CONFLICT (chunk_id) DO UPDATE SET
+                content     = EXCLUDED.content,
+                embedding   = EXCLUDED.embedding,
+                embedded_at = EXCLUDED.embedded_at
+            """;
+
+    /** chunk + 벡터 배치 upsert: 임베딩 API 묶음(20개)과 같은 단위로 한 번의 DB 왕복에 저장 */
+    public void batchUpsert(List<ChunkDocument> chunks, List<String> vectorStrs) {
+        Timestamp now = Timestamp.valueOf(LocalDateTime.now());
+        jdbc.batchUpdate(UPSERT_SQL, new org.springframework.jdbc.core.BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(java.sql.PreparedStatement ps, int i) throws java.sql.SQLException {
+                ChunkDocument c = chunks.get(i);
+                ps.setString(1, c.getChunkId());
+                ps.setString(2, c.getRepoOwner());
+                ps.setString(3, c.getRepoName());
+                ps.setString(4, c.getFilePath());
+                ps.setString(5, c.getHeading());
+                ps.setString(6, c.getContent());
+                ps.setString(7, c.getUrl());
+                ps.setString(8, vectorStrs.get(i));
+                ps.setTimestamp(9, now);
+            }
+
+            @Override
+            public int getBatchSize() { return chunks.size(); }
+        });
+    }
+
     /** chunk + 벡터 upsert (ON CONFLICT chunk_id) */
     public void upsert(ChunkDocument chunk, String vectorStr) {
-        jdbc.update("""
-                INSERT INTO chunk_embeddings
-                    (chunk_id, repo_owner, repo_name, file_path, heading, content, url, embedding, embedded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?::vector, ?)
-                ON CONFLICT (chunk_id) DO UPDATE SET
-                    content     = EXCLUDED.content,
-                    embedding   = EXCLUDED.embedding,
-                    embedded_at = EXCLUDED.embedded_at
-                """,
+        jdbc.update(UPSERT_SQL,
                 chunk.getChunkId(),
                 chunk.getRepoOwner(),
                 chunk.getRepoName(),

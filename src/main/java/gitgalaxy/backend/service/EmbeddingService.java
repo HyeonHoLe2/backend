@@ -8,6 +8,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import gitgalaxy.backend.config.VertexAiProperties;
+import gitgalaxy.backend.metrics.CollectorMetrics;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +26,15 @@ public class EmbeddingService {
     private static final long RETRY_DELAY_MS = 1000;
 
     private final VertexAiProperties props;
-    private VertexAI vertexAI;
-    private PredictionServiceClient client;
+    private final CollectorMetrics collectorMetrics;
+    // 여러 스레드가 동시에 임베딩을 호출하므로 volatile + 재연결은 한 스레드만
+    private volatile VertexAI vertexAI;
+    private volatile PredictionServiceClient client;
     private String endpointName;
 
-    public EmbeddingService(VertexAiProperties props) {
+    public EmbeddingService(VertexAiProperties props, CollectorMetrics collectorMetrics) {
         this.props = props;
+        this.collectorMetrics = collectorMetrics;
     }
 
     @PostConstruct
@@ -62,8 +66,9 @@ public class EmbeddingService {
 
         Exception lastException = null;
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            PredictionServiceClient c = client;
             try {
-                return doEmbed(input);
+                return doEmbed(c, input);
             } catch (Exception e) {
                 lastException = e;
                 log.warn("임베딩 시도 {}/{} 실패: {}", attempt + 1, MAX_RETRIES, e.getMessage());
@@ -72,7 +77,8 @@ public class EmbeddingService {
                         Thread.currentThread().interrupt();
                         throw new RuntimeException("Embedding 인터럽트", ie);
                     }
-                    reconnect();
+
+                    reconnect(c);
                 }
             }
         }
@@ -93,8 +99,10 @@ public class EmbeddingService {
 
         Exception lastException = null;
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            long start = System.nanoTime();
+            PredictionServiceClient c = client;
             try {
-                PredictResponse response = client.predict(endpointName, instances, Value.newBuilder().build());
+                PredictResponse response = c.predict(endpointName, instances, Value.newBuilder().build());
                 List<float[]> result = new ArrayList<>();
                 for (int i = 0; i < response.getPredictionsCount(); i++) {
                     ListValue values = response.getPredictions(i)
@@ -109,8 +117,10 @@ public class EmbeddingService {
                     }
                     result.add(vector);
                 }
+                collectorMetrics.embeddingRequest("success", start);
                 return result;
             } catch (Exception e) {
+                collectorMetrics.embeddingRequest("failed", start);
                 lastException = e;
                 log.warn("배치 임베딩 시도 {}/{} 실패: {}", attempt + 1, MAX_RETRIES, e.getMessage());
                 if (attempt < MAX_RETRIES - 1) {
@@ -118,21 +128,21 @@ public class EmbeddingService {
                         Thread.currentThread().interrupt();
                         throw new RuntimeException("Embedding 인터럽트", ie);
                     }
-                    reconnect();
+                    reconnect(c);
                 }
             }
         }
         throw new RuntimeException("배치 Embedding 실패: " + lastException.getMessage(), lastException);
     }
 
-    private float[] doEmbed(String input) {
+    private float[] doEmbed(PredictionServiceClient c, String input) {
         Value instance = Value.newBuilder()
                 .setStructValue(Struct.newBuilder()
                         .putFields("content", Value.newBuilder().setStringValue(input).build())
                         .build())
                 .build();
 
-        PredictResponse response = client.predict(endpointName, List.of(instance), Value.newBuilder().build());
+        PredictResponse response = c.predict(endpointName, List.of(instance), Value.newBuilder().build());
 
         ListValue values = response.getPredictions(0)
                 .getStructValue()
@@ -148,7 +158,9 @@ public class EmbeddingService {
         return vector;
     }
 
-    private void reconnect() {
+    /** 실패한 호출이 쓰던 클라이언트가 아직 현재 클라이언트일 때만 교체 (다른 스레드가 이미 재연결했으면 그대로 사용) */
+    private synchronized void reconnect(PredictionServiceClient failed) {
+        if (failed != client) return;
         log.info("gRPC 재연결 시도...");
         try {
             if (client != null) client.close();

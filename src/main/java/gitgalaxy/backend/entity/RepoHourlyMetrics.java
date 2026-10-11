@@ -55,6 +55,10 @@ public class RepoHourlyMetrics {
     @Column(name = "release_count")
     private int releaseCount;
 
+    // 기존 행이 있는 테이블에 ddl-auto=update로 추가되므로 default 필요
+    @Column(name = "fork_count", columnDefinition = "integer not null default 0")
+    private int forkCount;
+
     @Column(name = "active_score")
     private Double activeScore;
 

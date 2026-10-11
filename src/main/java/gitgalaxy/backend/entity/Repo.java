@@ -56,4 +56,8 @@ public class Repo {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    /** ES에 마지막으로 반영한 시각. NULL = 반영 대기 (저장 트랜잭션에서 NULL로 표시 → RepoEsSyncService가 주기적으로 색인) */
+    @Column(name = "es_synced_at")
+    private LocalDateTime esSyncedAt;
 }

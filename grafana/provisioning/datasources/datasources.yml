@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  # 수집 파이프라인 현황(repos / chunk_embeddings / repo_time)을 DB에서 직접 조회
+  - name: GitGalaxy DB
+    uid: gitgalaxy-db
+    type: grafana-postgresql-datasource
+    url: postgres:5432
+    user: postgres
+    jsonData:
+      database: gitgalaxy
+      sslmode: disable
+      postgresVersion: 1500
+    secureJsonData:
+      password: "1234"

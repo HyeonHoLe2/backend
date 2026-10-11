@@ -15,7 +15,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          # 기존 색 정상 종료(진행 중인 수집 마무리)를 기다리므로 기본 10분보다 길게
+          command_timeout: 30m
           script: |
             cd ~/backend
             git pull origin main
-            docker compose -f compose.prod.yml up -d --build
+            ./scripts/deploy-blue-green.sh

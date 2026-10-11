@@ -13,4 +13,10 @@ public class VertexAiProperties {
     private String location = "us-central1";
     private String model = "gemini-2.5-flash";
     private String embeddingModel = "text-embedding-004";
+
+    /** 신규 repo 온보딩 시 README AI 요약 생성 여부 */
+    private boolean summaryEnabled = true;
+
+    /** 임베딩 API 동시 호출 수 (청크 임베딩·레포 임베딩) */
+    private int embeddingConcurrency = 4;
 }
